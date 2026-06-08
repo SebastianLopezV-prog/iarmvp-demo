@@ -48,12 +48,35 @@ Windows, Python 3.13, venv at `venv/`.
 
 ```powershell
 pip install -e ".[dev]"                       # install package (editable) + dev tools
-.\venv\Scripts\python.exe -m pytest -q         # run the full suite (67 tests)
+.\venv\Scripts\python.exe -m pytest -q         # run the full suite (73 tests)
 ```
 
 The Optimeering API key must live in `.env` as `OPTIMEERING_API_KEY` (gitignored).
 It is never printed, logged, or committed. The client pins the production host
 (`https://app.optimeering.com`).
+
+### ⚠️ REQUIRED for real DAM (spot) prices — install the internal SDK wheel
+
+The day-ahead **spot price** (needed for **Gross IaR**) comes from Optimeering's
+**internal** SDK, **`optipyclient`**, which is **NOT on PyPI** — it is a **vendored wheel**
+published on the **`Volue/sirius-prime` GitHub Releases** page. `pip install -e .` does
+**not** install it, so you must add it manually:
+
+1. Open `https://github.com/Volue/sirius-prime/releases` (requires Volue org access; the
+   `Volue` org enforces SAML SSO — authorize your GitHub credential for it).
+2. Download the latest **`optipyclient-*.whl`** asset.
+3. Put it in **`vendor/`** (gitignored) and install into the venv:
+
+   ```powershell
+   .\venv\Scripts\python.exe -m pip install --force-reinstall vendor\optipyclient-*.whl
+   ```
+
+   *(Or, with the GitHub CLI authenticated:*
+   `gh release download --repo Volue/sirius-prime -p "*.whl" -D vendor/ --clobber`*.)*
+
+Auth reuses the same `OPTIMEERING_API_KEY` (no OAuth needed). **Without this wheel**, the
+markets client raises a clear error and `run_iar.py` falls back to a flat `--dam-price`
+stub (Spread IaR is unaffected; only real Gross IaR needs it).
 
 ## Run
 
