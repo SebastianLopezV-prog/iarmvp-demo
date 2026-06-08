@@ -25,7 +25,9 @@ UI talks only to `iar/service.py`. See the architecture design doc for the full 
 ```
 iar/
   db/          SQLAlchemy models + session (init_db, get_session)
-  ingestion/   optimeering_client.py (live forecast), flatfile_loader.py (CSV/Excel)
+  ingestion/   optimeering_client.py (spread forecast, public SDK),
+               markets_client.py (real DAM spot price, internal optipyclient SDK),
+               flatfile_loader.py (CSV/Excel + DAM-price store)
   simulation/  imbalance_model.py (2.1), price_sampler.py (2.2), engine.py (2.3),
                persistence.py (2.4)
   risk/        alerts.py, backtest.py        (Week 3 — not yet built)
