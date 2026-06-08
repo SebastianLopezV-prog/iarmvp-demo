@@ -159,16 +159,23 @@ Run commands:
 - Historical `retrieve` returns every forecast vintage in the window (2 days ≈ 500k rows /
   122 MB) — Week-3 backfill must filter by `vintage_ts`, not load whole windows.
 
-**NEXT: Week 2 — the Monte Carlo engine. Requires `iar_refined.py` from the user (not yet
-provided).** Build:
-- **2.1** `iar/simulation/imbalance_model.py` — per-MTU imbalance distribution (parametric,
-  sigma a configurable fraction of forecast/capacity).
-- **2.2** `iar/simulation/price_sampler.py` — inverse-CDF sampling from the Optimeering
-  quantiles; preserve tails, do NOT refit to Normal.
-- **2.3** `iar/simulation/engine.py` — sample price + position **independently**, ≥5,000
-  scenarios, per-scenario P&L, **summed-quantile** Gross/Spread IaR + CIaR. Remove the
-  prototype's t-copula entirely. Keep the uniform-draw step separable (copula insertion
-  point) but add NO copula scaffolding now.
-- **2.4** persist `SimulationRun` + `IaRResult`. **2.5** validation (analytic all-Normal case,
-  P05 convergence vs scenario count, seed reproducibility, and an explicit "summed-quantile
-  NOT summed per-MTU IaR" check).
+**Week 2 progress (`iar_refined.py` provided; t-copula deliberately NOT carried over):**
+- **2.1 DONE** `iar/simulation/imbalance_model.py` — parametric per-MTU imbalance
+  distribution (Gaussian / scaled-t, sigma a configurable fraction of forecast/capacity);
+  exposes `ppf` (the separable uniform-draw seam) + `sample`.
+- **2.2 DONE** `iar/simulation/price_sampler.py` — `QuantilePriceSampler`, inverse-CDF
+  sampling from the Optimeering quantiles; preserves asymmetry/tails (no Normal refit);
+  linear/clamp tail policy.
+- **2.3 DONE** `iar/simulation/engine.py` — `run_simulation`: independent price + position
+  sampling, per-scenario **summed-quantile** Gross/Spread IaR + CIaR. The copula insertion
+  point is a real swappable seam (`ScenarioDraw` Protocol; `IndependentDraw` default) — NO
+  copula code, but a future copula is a clean drop-in. Validation tests live in
+  `tests/test_engine.py` (analytic Normal, convergence, reproducibility, summed-quantile-vs-naive).
+- **2.4 NEXT** persist `SimulationRun` + `IaRResult` (use `IaRReport.summary()`).
+  **2.5** formalise/extend the validation suite.
+
+Engine sign convention: `cost = imbalance × price` (positive = cost/bad); IaR is the
+upper-tail quantile of summed cost, CIaR the mean beyond it.
+
+**Repo:** private GitHub `SebastianLopezV-prog/iarmvp`. A local PostToolUse hook
+auto-commits after every Edit/Write (`.claude/settings.local.json`); pushes are manual.
