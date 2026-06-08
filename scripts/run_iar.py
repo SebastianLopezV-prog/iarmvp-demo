@@ -34,6 +34,7 @@ from datetime import datetime, timezone
 import numpy as np
 import pandas as pd
 
+from iar.db.models import DAMPosition, GenerationForecast, Portfolio
 from iar.db.session import DEFAULT_DB_PATH, get_session, init_db
 from iar.ingestion.flatfile_loader import get_or_create_portfolio
 from iar.ingestion.markets_client import OptimeeringMarketsClient
