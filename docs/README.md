@@ -15,6 +15,23 @@ Nordic/European balancing market.
 - Outputs: **Gross IaR**, **Spread IaR**, and **CIaR / Expected Shortfall**.
   Period IaR is the quantile of the *summed* P&L across MTUs (not the sum of per-MTU IaRs).
 
+## What you need to add (NOT in the repo)
+
+Cloning gives you the code, but four things live **outside git** — you must add them
+yourself. The tool **degrades gracefully**: with just 1–2 you get live Spread IaR (Gross +
+portfolio stubbed); add 3 and 4 to make everything real except the imbalance `sigma`.
+
+| # | What to add | Required for | If missing |
+|---|-------------|--------------|------------|
+| 1 | **Python 3.13 + venv**, then `pip install -e ".[dev]"` | everything | nothing runs |
+| 2 | **`.env`** file with `OPTIMEERING_API_KEY=<key>` | any live data (spread, DAM) | live fetches fail |
+| 3 | **`optipyclient` wheel** in `vendor/` (from `Volue/sirius-prime` Releases) | real DAM spot → real **Gross IaR** | flat `--dam-price` stub (Spread IaR fine) |
+| 4 | **`windsim`** (`pip install git+…/sirius-imb-at-risk-mvp`) | real portfolio positions/generation/actuals | synthetic stub portfolio |
+
+Items 3–4 are **private Volue packages** (not on PyPI) and require **Volue GitHub org
+access** (the org enforces SAML SSO — authorize your git credential once). Exact install
+commands are in **Setup** below.
+
 ## Architecture (one line)
 
 SQLite is the integration hub; backend logic lives in importable modules; the Streamlit
