@@ -162,7 +162,7 @@ def main() -> None:
     if pos_map:
         dam_pos = np.array([pos_map[ft[i]][0] for i in keep])
         gen = np.array([pos_map[ft[i]][1] for i in keep])
-        pf_src = f"REAL — '{pf_name}' loaded via client CSV path (windsim)"
+        pf_src = f"REAL - '{pf_name}' loaded via client CSV path (windsim)"
     else:
         dam_pos, gen = stub_portfolio(n_mtus, args.capacity_mw, args.seed)
         pf_src = "STUB synthetic (no portfolio loaded — run scripts/load_windsim_data.py)"
