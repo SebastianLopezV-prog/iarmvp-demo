@@ -1,0 +1,25 @@
+# Application configuration for the IaR MVP.
+# Loaded by the backend (Python 3.11+ stdlib `tomllib`). No secrets here —
+# the Optimeering API key lives only in .env.
+
+[simulation]
+n_scenarios = 5000        # >= 5,000 to estimate P05 reliably (deck Challenge 4)
+seed = 42                 # fixed seed for reproducible runs
+confidence_levels = [0.95, 0.99]   # alpha = 0.05 (primary), 0.01
+
+[horizon]
+mtu_minutes = 15          # 15-minute MTUs (Nordic settlement)
+default_hours = 24        # default forward horizon
+
+[markets]
+price_areas = ["NO1", "NO2", "SE3"]   # single area per portfolio (MVP scope)
+
+[imbalance_model]
+# Parametric forecast-error model for (DAM position - forecast generation).
+distribution = "normal"   # "normal" | "scaled_t"
+sigma_fraction = 0.15     # sigma as a fraction of forecast/capacity (recalibrated in Week 3)
+
+[paths]
+db = "data/iar.db"
+uploads = "data/uploads"
+cache = "data/cache"

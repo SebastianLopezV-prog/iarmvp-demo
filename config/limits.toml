@@ -1,0 +1,17 @@
+# Per-portfolio euro-limits for IaR alerting (Task 3.4).
+# Limits are set in EUR, per IaR variant (gross/spread), per limit type.
+# `default` applies unless a portfolio-specific section overrides it.
+
+[default.gross]
+per_mtu_eur = 5000
+rolling_window_eur = 20000
+remaining_day_eur = 50000
+
+[default.spread]
+per_mtu_eur = 4000
+rolling_window_eur = 15000
+remaining_day_eur = 40000
+
+# Example portfolio override (keyed by portfolio name); extend as portfolios are added.
+# [portfolio."NO2 Wind".gross]
+# remaining_day_eur = 75000

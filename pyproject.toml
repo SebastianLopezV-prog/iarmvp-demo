@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "iar-mvp"
+version = "0.1.0"
+description = "Imbalance at Risk (IaR) MVP — local Monte Carlo PoC for a wind portfolio."
+readme = "docs/README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy",
+    "pandas",
+    "scipy",
+    "SQLAlchemy>=2.0",
+    "streamlit",
+    "plotly",
+    "optimeering",
+    "python-dotenv",
+    "tenacity",
+    "openpyxl",          # Excel support for the flat-file loader
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+]
+
+[tool.setuptools]
+packages = ["iar", "iar.db", "iar.ingestion", "iar.simulation", "iar.risk"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
