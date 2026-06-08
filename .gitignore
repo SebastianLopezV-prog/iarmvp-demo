@@ -19,8 +19,7 @@ data/uploads/*
 .claude/settings.local.json
 test_apkey.py
 
-# Throwaway beginner demo UI — never committed
-beginner UI/
+# Scratch (throwaway) — never committed
 scratch/
 
 # Vendored internal SDK wheel (optipyclient) — pulled from Volue/sirius-prime releases
