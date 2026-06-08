@@ -93,14 +93,41 @@ def fetch_dam_map(area: str):
     return {pd.to_datetime(r["timestamp"], utc=True): float(r["eur_per_mwh"]) for r in recs}
 
 
+def fetch_positions_map(area: str):
+    """Return ({pd.Timestamp(UTC): (dam_pos_mwh, gen_mwh)}, portfolio_name) from the DB.
+
+    Reads the REAL DAM positions + generation forecast that a client loaded (e.g. via
+    scripts/load_windsim_data.py) for the portfolio in ``area``. Empty if none loaded.
+    """
+    init_db()
+    with get_session() as s:
+        pf = (
+            s.query(Portfolio).filter_by(price_area=area)
+            .order_by(Portfolio.portfolio_id.desc()).first()
+        )
+        if pf is None:
+            return {}, None
+        dam = {r.timestamp: r.mwh for r in s.query(DAMPosition).filter_by(portfolio_id=pf.portfolio_id)}
+        gen = {
+            r.timestamp: r.forecast_mwh
+            for r in s.query(GenerationForecast).filter_by(portfolio_id=pf.portfolio_id)
+        }
+        # SQLite returns naive UTC datetimes -> normalise to tz-aware UTC for alignment.
+        out = {
+            pd.to_datetime(t, utc=True): (dam[t], gen[t])
+            for t in (set(dam) & set(gen))
+        }
+        return out, pf.name
+
+
 def stub_portfolio(n_mtus: int, capacity_mw: float, seed: int):
-    """Synthetic [STUB] wind portfolio aligned to the simulated horizon."""
+    """Synthetic [STUB] wind portfolio aligned to the simulated horizon (fallback only)."""
     rng = np.random.default_rng(seed)
     cap_mwh = capacity_mw * MTU_HOURS
     factor = np.clip(rng.normal(0.45, 0.12, n_mtus), 0.05, 0.95)
     gen = factor * cap_mwh                                   # forecast generation
     dam_pos = np.clip(gen + rng.normal(0, 0.06 * cap_mwh, n_mtus), 0, cap_mwh)
-    return dam_pos, gen, cap_mwh
+    return dam_pos, gen
 
 
 def main() -> None:
