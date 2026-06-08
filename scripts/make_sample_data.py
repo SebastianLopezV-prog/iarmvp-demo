@@ -61,11 +61,11 @@ def generate() -> dict[str, pd.DataFrame]:
     sigma = 0.12 * cap_mwh
     actual_mwh = np.clip(forecast_mwh + rng.normal(0, sigma, N_MTU), 0.0, cap_mwh)
 
-    # TODO(dam-source): SYNTHETIC day-ahead (spot) price — NOT real market data.
-    # Smooth diurnal shape (morning/evening peaks) + mild noise, purely so the
-    # Gross-IaR path has *something* to run on. The absolute imbalance price is
-    # this + the Optimeering spread. Replace with a real feed (Volue D&F / PowerTSM
-    # / ENTSO-E / Nord Pool) before Gross IaR is trustworthy. See load_dam_prices().
+    # SYNTHETIC day-ahead (spot) price — OFFLINE FALLBACK ONLY.
+    # The REAL NO2 spot now comes from Optimeering's internal MarketsApi (DAM cleared
+    # price) via iar/ingestion/markets_client.py; run_pipeline.py / run_iar.py use that
+    # and only fall back to this CSV when the internal SDK wheel is unavailable.
+    # Smooth diurnal shape + mild noise so the Gross-IaR path still runs offline.
     dam_price = 40.0 + 15.0 * np.sin(2 * np.pi * (hours - 8) / 24.0)
     dam_price = np.maximum(dam_price + rng.normal(0, 3.0, N_MTU), 0.0)
 
