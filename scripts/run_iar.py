@@ -135,27 +135,41 @@ def main() -> None:
 
     times, pct, spread, vintage = fetch_spread_matrix(args.area)
     dam_map = fetch_dam_map(args.area)
+    pos_map, pf_name = fetch_positions_map(args.area)
 
-    # Simulate over the intersection of (live spread MTUs) and (real DAM MTUs).
+    # Simulate over the intersection of the available sources:
+    #   live spread MTUs  ∩  (real DAM MTUs if any)  ∩  (real position MTUs if any).
     ft = pd.to_datetime(times, utc=True)
+    keep = [
+        i for i, t in enumerate(ft)
+        if (not dam_map or t in dam_map) and (not pos_map or t in pos_map)
+    ]
+    if not keep:
+        raise SystemExit("No overlapping MTUs across forecast / DAM price / positions.")
+
+    spread = spread[keep]
+    n_mtus = len(keep)
+
+    # DAM (spot) price
     if dam_map:
-        keep = [i for i, t in enumerate(ft) if t in dam_map]
-        if keep:
-            spread = spread[keep]
-            dam_price = np.array([dam_map[ft[i]] for i in keep])
-            dam_src = "LIVE (Optimeering DAM cleared price, internal SDK)"
-        else:
-            dam_price = np.full(len(times), args.dam_price)
-            dam_src = f"flat {args.dam_price:.2f} [STUB — no overlap with live DAM]"
+        dam_price = np.array([dam_map[ft[i]] for i in keep])
+        dam_src = "LIVE (Optimeering DAM cleared price, internal SDK)"
     else:
-        dam_price = np.full(len(times), args.dam_price)
+        dam_price = np.full(n_mtus, args.dam_price)
         dam_src = f"flat {args.dam_price:.2f} EUR/MWh [STUB fallback]"
 
-    n_mtus = len(dam_price)
+    # Portfolio positions + generation
+    if pos_map:
+        dam_pos = np.array([pos_map[ft[i]][0] for i in keep])
+        gen = np.array([pos_map[ft[i]][1] for i in keep])
+        pf_src = f"REAL — '{pf_name}' loaded via client CSV path (windsim)"
+    else:
+        dam_pos, gen = stub_portfolio(n_mtus, args.capacity_mw, args.seed)
+        pf_src = "STUB synthetic (no portfolio loaded — run scripts/load_windsim_data.py)"
+
     price = QuantilePriceSampler.from_percentiles(pct, spread)
-    dam_pos, gen, cap_mwh = stub_portfolio(n_mtus, args.capacity_mw, args.seed)
     imb = ImbalanceModel.from_inputs(
-        dam_pos, gen, capacity_mwh=cap_mwh,
+        dam_pos, gen, capacity_mwh=args.capacity_mw * MTU_HOURS,
         config=ImbalanceModelConfig(
             dist=args.dist, sigma_fraction=args.sigma_fraction, scale_basis="capacity"
         ),
