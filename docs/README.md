@@ -129,6 +129,22 @@ Without it, `run_iar.py` falls back to a synthetic stub portfolio.
 Engine sign convention: `cost = imbalance × price` (positive = cost/bad). IaR is the
 upper-tail quantile of the summed cost; CIaR is the mean beyond it.
 
+## Dashboard (demo UI)
+
+A simple Streamlit dashboard at **`beginner UI/dashboard.py`** visualizes one run:
+headline Gross/Spread IaR + CIaR (shown as **P&L: negative = loss**), the scenario P&L
+distribution with mean/IaR/CIaR markers, the live spread fan chart, and a **data-source
+panel** (which inputs are real vs stub).
+
+```powershell
+.\venv\Scripts\python.exe -m streamlit run "beginner UI\dashboard.py"   # then open http://localhost:8501
+```
+
+It uses the **same real inputs as `run_iar.py`** (live spread; real DAM if the wheel is
+installed; real positions if a portfolio is loaded), falling back to stubs otherwise. Drag
+the **sigma** slider to see how forecast-error size drives the risk. (It reuses the backend
+modules only — no logic lives in the UI.)
+
 ## Status
 
 **Week 1 (ingestion + storage) and Week 2 (Monte Carlo engine) COMPLETE — 73 tests passing.**
