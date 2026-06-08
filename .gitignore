@@ -22,3 +22,6 @@ test_apkey.py
 # Throwaway beginner demo UI — never committed
 beginner UI/
 scratch/
+
+# Vendored internal SDK wheel (optipyclient) — pulled from Volue/sirius-prime releases
+vendor/
