@@ -100,6 +100,7 @@ Without it, `run_iar.py` falls back to a synthetic stub portfolio.
 ## Run
 
 ```powershell
+.\venv\Scripts\python.exe scripts\load_windsim_data.py  # ingest REAL portfolio data (client CSV path)
 .\venv\Scripts\python.exe scripts\run_iar.py            # Monte Carlo -> Gross/Spread IaR + CIaR
 .\venv\Scripts\python.exe scripts\run_iar.py --store    # ...and persist the run to data/iar.db
 .\venv\Scripts\python.exe scripts\validate_engine.py    # engine validation report (8/8 checks)
