@@ -158,13 +158,23 @@ Run commands:
 - **Quantiles differ by resolution.** The **PT15M** Imbalance series (the one we use) gives the
   full 9 quantiles **incl. P05/P95** (`1,5,10,25,50,75,90,95,99`); the PT1H series gives only 5.
 - **Imbalance is published as `Price_Spread` (EUR), not absolute price.** Spread IaR works
-  directly; **Gross IaR needs absolute price = DAM price + spread**. Confirmed: the *entire*
-  NO2 Optimeering catalogue (46 series, 11 products) is balancing-market only — **no
-  day-ahead/spot product exists**, so the spot price must come from elsewhere. **RESOLVED:**
-  Gross IaR is in scope; spot price is ingested as a flat file (`dam_price_*.csv` →
-  `dam_prices` table, keyed by area) via `load_dam_prices(...)`. The table is source-agnostic
-  so a real price feed (ENTSO-E / Nord Pool / Volue) can replace the CSV later with no
-  downstream change.
+  directly; **Gross IaR needs absolute price = DAM price + spread**. Note: the DAM price term
+  is *baked into* Optimeering's spread (it publishes `imbalance_price − spot`), so SPREAD IaR
+  needs no separate DAM input; only GROSS does (to rebuild the absolute price). See the note
+  block in `engine.py` at the cost computation.
+- **Optimeering (public SDK) does NOT publish day-ahead/spot price.** Confirmed against the
+  *full* catalogue this key can see — **625 series, 13 areas (DE/DK/FI/NO1-5/SE1-4), 17
+  products — every one balancing-market** (FCR/aFRR/mFRR/Imbalance). The word "spot" appears
+  only in imbalance descriptions as the spread baseline. So the spot price must come from
+  elsewhere (see OPEN ITEM below).
+- **Spot price ingestion is built and source-agnostic:** flat file `dam_price_*.csv` →
+  `dam_prices` table (keyed by area) via `load_dam_prices(...)`. Currently fed by a SYNTHETIC
+  stub (`make_sample_data.py`, `TODO(dam-source)`); a real feed writes the same table with no
+  downstream change. **DAM is a cleared auction price → a deterministic engine input (not
+  sampled); only the imbalance spread is simulated.**
+- **Client host is pinned** to production (`DEFAULT_HOST = https://app.optimeering.com`) in
+  `optimeering_client.py` (override via `OPTIMEERING_HOST`). We use the **public/external**
+  `optimeering` SDK with **API-key** auth.
 - Historical `retrieve` returns every forecast vintage in the window (2 days ≈ 500k rows /
   122 MB) — Week-3 backfill must filter by `vintage_ts`, not load whole windows.
 
