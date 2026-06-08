@@ -218,6 +218,21 @@ def run_simulation(
     imbalance = imbalance_model.ppf(u_imbalance)  # MWh
     absolute_price = dam_price[None, :] + spread  # EUR/MWh
 
+    # --- Which basis needs the DAM (spot) price? (counterintuitive — read this) ---
+    # By definition:
+    #   Gross  = imbalance x  imbalance_price                 (total settlement cost)
+    #   Spread = imbalance x (imbalance_price - DAM_price)    (under/over-perf vs day-ahead)
+    # So DAM appears in the SPREAD definition, not Gross. BUT Optimeering does not
+    # publish the absolute imbalance price — it publishes the SPREAD directly, i.e.
+    #   spread (s) = imbalance_price - DAM_price.
+    # Substituting:
+    #   Spread = imbalance x s                 -> uses Optimeering's spread AS-IS;
+    #                                             DAM is already baked in, none needed here.
+    #   Gross  = imbalance x (DAM_price + s)   -> must ADD DAM back to rebuild the
+    #                                             absolute price -> this is why GROSS,
+    #                                             not Spread, depends on dam_price.
+    # Consequence: Spread IaR's price side is fully live (the spread); Gross additionally
+    # needs a real spot-price feed (currently a stub — see load_dam_prices TODO(dam-source)).
     # Summed-across-MTU cost per scenario (the period total), then read risk off.
     cost_gross = (imbalance * absolute_price).sum(axis=1)
     cost_spread = (imbalance * spread).sum(axis=1)
