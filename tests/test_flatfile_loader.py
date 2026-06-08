@@ -75,6 +75,26 @@ def test_load_dam_prices_is_idempotent(session, portfolio, tmp_path):
     assert session.query(DAMPrice).count() == 2  # not 4
 
 
+def test_store_dam_price_records(session, portfolio):
+    # Records as produced by markets_client.get_dam_prices(...)
+    recs = [
+        {"price_area": "NO2", "timestamp": "2026-06-08T12:30:00+00:00", "eur_per_mwh": 80.29},
+        {"price_area": "NO2", "timestamp": "2026-06-08T12:45:00+00:00", "eur_per_mwh": 84.89},
+    ]
+    assert store_dam_price_records(session, "NO2", recs) == 2
+    assert session.query(DAMPrice).count() == 2
+
+
+def test_store_dam_price_records_dedup_and_replace(session, portfolio):
+    recs = [
+        {"price_area": "NO2", "timestamp": "2026-06-08T12:30:00+00:00", "eur_per_mwh": 1.0},
+        {"price_area": "NO2", "timestamp": "2026-06-08T12:30:00+00:00", "eur_per_mwh": 2.0},
+    ]
+    assert store_dam_price_records(session, "NO2", recs) == 1  # deduped to one timestamp
+    store_dam_price_records(session, "NO2", recs)              # replace=True default
+    assert session.query(DAMPrice).count() == 1               # not duplicated
+
+
 def test_load_is_idempotent(session, portfolio, tmp_path):
     pid = portfolio.portfolio_id
     path = _write_csv(tmp_path, "dam.csv", "mwh")
