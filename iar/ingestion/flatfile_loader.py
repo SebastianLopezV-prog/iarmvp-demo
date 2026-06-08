@@ -175,22 +175,11 @@ def load_dam_prices(
     rather than ``portfolio_id`` — matching the other price tables. Needed to turn
     Optimeering's imbalance *spread* into an absolute price for Gross IaR.
 
-    .. warning::
-
-        TODO(dam-source): **STUB DATA SOURCE — NOT A REAL DAM PRICE FEED.**
-        Today this is fed by ``scripts/make_sample_data.py``, which writes a
-        *synthetic* diurnal price curve to ``dam_price_*.csv``. Those numbers are
-        invented and must NOT be treated as real market prices — any Gross IaR
-        computed from them is illustrative only.
-
-        Optimeering does NOT publish NO2 day-ahead/spot (confirmed: the whole NO2
-        catalogue is balancing-market only), so a real source must be wired in
-        before Gross IaR is trustworthy. Likely candidates: a Volue Data &
-        Forecasts / PowerTSM curve, or ENTSO-E / Nord Pool. Open question for
-        Erik M re: whether Optimeering can provide/derive spot on our subscription.
-
-        This table is source-agnostic: a real feed just needs to write
-        (price_area, timestamp, EUR/MWh) rows here — no downstream change required.
+    This is the **flat-file** path (offline / other sources). The **real** NO2 spot
+    price now comes from Optimeering's internal ``MarketsApi`` (DAM cleared price) —
+    fetch it with ``markets_client.OptimeeringMarketsClient.get_dam_prices(...)`` and
+    persist with :func:`store_dam_price_records`. Both write the same source-agnostic
+    ``dam_prices`` table, so downstream code is unchanged regardless of source.
     """
     path = Path(path)
     df = _validate(_read_file(path), "eur_per_mwh", path)
