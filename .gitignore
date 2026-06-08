@@ -19,5 +19,6 @@ data/uploads/*
 .claude/settings.local.json
 test_apkey.py
 
-# Throwaway scratch (e.g. demo UI) — never committed
+# Throwaway beginner demo UI — never committed
+beginner UI/
 scratch/
