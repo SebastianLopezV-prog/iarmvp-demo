@@ -109,11 +109,18 @@ def run() -> None:
         n_dam = load_dam_positions(s, pid, FILES["dam"])
         n_gen = load_generation_forecasts(s, pid, FILES["gen"])
         n_act = load_actual_delivery(s, pid, FILES["act"])
-        n_price = load_dam_prices(s, AREA, FILES["dam_price"])
+        # DAM (spot) price: REAL via the internal MarketsApi, fall back to the stub CSV.
+        try:
+            recs = OptimeeringMarketsClient().get_dam_prices(AREA, start="-P2D", end="P2D")
+            n_price = store_dam_price_records(s, AREA, recs)
+            dam_src = "LIVE (internal MarketsApi, DAM cleared price)"
+        except Exception as exc:  # noqa: BLE001 — optipyclient missing / auth / lookup
+            n_price = load_dam_prices(s, AREA, FILES["dam_price"])
+            dam_src = f"[STUB CSV fallback — {type(exc).__name__}]"
         print(
-            f"portfolio #{pid} '{pf.name}' ({pf.price_area}) | loaded [STUB] "
-            f"DAM_pos(MWh)={n_dam}, forecast(MWh)={n_gen}, actual(MWh)={n_act}, "
-            f"DAM_price(EUR/MWh)={n_price} rows"
+            f"portfolio #{pid} '{pf.name}' ({pf.price_area}) | loaded [STUB portfolio] "
+            f"DAM_pos(MWh)={n_dam}, forecast(MWh)={n_gen}, actual(MWh)={n_act} | "
+            f"DAM_price(EUR/MWh)={n_price} rows {dam_src}"
         )
 
         # --- real Optimeering price forecast ----------------------------- #
