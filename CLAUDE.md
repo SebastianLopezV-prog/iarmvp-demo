@@ -180,11 +180,20 @@ Run commands:
   point is a real swappable seam (`ScenarioDraw` Protocol; `IndependentDraw` default) — NO
   copula code, but a future copula is a clean drop-in. Validation tests live in
   `tests/test_engine.py` (analytic Normal, convergence, reproducibility, summed-quantile-vs-naive).
-- **2.4 NEXT** persist `SimulationRun` + `IaRResult` (use `IaRReport.summary()`).
-  **2.5** formalise/extend the validation suite.
+- **2.4 DONE** `iar/simulation/persistence.py` — `persist_report` writes one
+  `SimulationRun` + a `gross` and `spread` `IaRResult`; stores seed/n_scenarios/vintage_ts
+  for reproducibility & backtest joins (summaries only, not raw scenarios). Wired into
+  `run_iar.py --store`. Tests in `tests/test_persistence.py`.
+- **2.5 DONE** validation. Automated in `tests/test_engine.py`; human-readable report in
+  `scripts/validate_engine.py` (8/8: analytic all-Normal IaR+CIaR, 1/sqrt(N) convergence,
+  seed reproducibility, summed-quantile-vs-naive). Story written up in `docs/validation.md`.
 
 Engine sign convention: `cost = imbalance × price` (positive = cost/bad); IaR is the
 upper-tail quantile of summed cost, CIaR the mean beyond it.
+
+**NEXT: Week 3** — risk/alerts + backtesting (`iar/risk/`). Backtest joins each settled
+period's realised cost to the IaR estimate whose `vintage_ts` precedes it; Kupiec POF test
+(~5% exceedances at P95); recalibrate the imbalance-model `sigma` against realised outcomes.
 
 **Repo:** private GitHub `SebastianLopezV-prog/iarmvp`. A local PostToolUse hook
 auto-commits after every Edit/Write (`.claude/settings.local.json`); pushes are manual.
