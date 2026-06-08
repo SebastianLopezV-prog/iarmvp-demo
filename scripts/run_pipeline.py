@@ -36,7 +36,9 @@ from iar.ingestion.flatfile_loader import (
     load_dam_positions,
     load_dam_prices,
     load_generation_forecasts,
+    store_dam_price_records,
 )
+from iar.ingestion.markets_client import OptimeeringMarketsClient
 from iar.ingestion.optimeering_client import OptimeeringForecastClient
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
