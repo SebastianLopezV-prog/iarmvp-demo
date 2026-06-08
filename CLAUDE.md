@@ -167,11 +167,17 @@ Run commands:
   products — every one balancing-market** (FCR/aFRR/mFRR/Imbalance). The word "spot" appears
   only in imbalance descriptions as the spread baseline. So the spot price must come from
   elsewhere (see OPEN ITEM below).
-- **Spot price ingestion is built and source-agnostic:** flat file `dam_price_*.csv` →
-  `dam_prices` table (keyed by area) via `load_dam_prices(...)`. Currently fed by a SYNTHETIC
-  stub (`make_sample_data.py`, `TODO(dam-source)`); a real feed writes the same table with no
-  downstream change. **DAM is a cleared auction price → a deterministic engine input (not
-  sampled); only the imbalance spread is simulated.**
+- **DAM/spot price — RESOLVED via the INTERNAL SDK.** The internal `optipyclient` SDK
+  (`MarketsApi`) serves the **DAM cleared price** (= spot): `market='DAM'`,
+  `series_type='cleared price'` (NO2 id 173, Nordpool, 15-min). Wired in via
+  `iar/ingestion/markets_client.py::OptimeeringMarketsClient.get_dam_prices(area)` →
+  `flatfile_loader.store_dam_price_records(...)` → `dam_prices` table. Same API key works
+  (no OAuth). `run_iar.py` now computes **real Gross IaR** over the live-spread ∩ real-DAM
+  MTUs; flat `--dam-price` is only a fallback. The old `dam_price_*.csv` flat-file path
+  (`load_dam_prices`) remains for offline use. **DAM is a cleared auction price → a
+  deterministic engine input (not sampled); only the imbalance spread is simulated.**
+  `optipyclient` is a **VENDORED wheel** (Volue/sirius-prime releases → `vendor/`,
+  gitignored) — see README Setup; lazy-imported so the package still works without it.
 - **Client host is pinned** to production (`DEFAULT_HOST = https://app.optimeering.com`) in
   `optimeering_client.py` (override via `OPTIMEERING_HOST`). We use the **public/external**
   `optimeering` SDK with **API-key** auth.
