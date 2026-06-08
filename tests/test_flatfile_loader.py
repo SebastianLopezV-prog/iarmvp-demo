@@ -13,6 +13,7 @@ from iar.ingestion.flatfile_loader import (
     load_dam_positions,
     load_dam_prices,
     load_generation_forecasts,
+    store_dam_price_records,
 )
 
 
