@@ -114,12 +114,21 @@ iar_mvp/
 - **Review before committing.** Never stage `.env`. Confirm `.gitignore` is working before
   the first commit so the key never enters git history.
 
-## Current status (end of Week 1)
+## Current status (Week 2 COMPLETE)
 
 Environment: Windows, Python 3.13, venv at `venv/` (use `.\venv\Scripts\python.exe`).
-Package installed editable (`pip install -e ".[dev]"`). **16 tests passing.**
+Package installed editable (`pip install -e ".[dev]"`). **67 tests passing.**
 (Note: the Read tool can't render PDFs here — `pdftoppm` is missing; extract PDF text with
 `pypdf` instead.)
+
+Run commands (Week 2):
+```
+.\venv\Scripts\python.exe scripts\run_iar.py            # run the MC, print Gross/Spread IaR+CIaR
+.\venv\Scripts\python.exe scripts\run_iar.py --store    # ...and persist the run to data/iar.db
+.\venv\Scripts\python.exe scripts\validate_engine.py    # 2.5 validation report (8/8 checks)
+.\venv\Scripts\python.exe scripts\verify_all.py         # 1.1->2.x end-to-end health check
+.\venv\Scripts\python.exe -m pytest -q                  # full suite (67 tests)
+```
 
 **Week 1 COMPLETE (1.1–1.5), all tested and verified against the live Optimeering API:**
 - **1.1** repo + package skeleton; `pip install -e .` works.
