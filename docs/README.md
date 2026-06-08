@@ -35,9 +35,10 @@ iar/
 app/           Streamlit dashboard (UI only — skeleton)
 scripts/       run_pipeline.py  (ingest -> store smoke path)
                run_iar.py       (run the Monte Carlo, print/store IaR)
+               load_windsim_data.py (REAL portfolio data via the client CSV path)
                validate_engine.py (2.5 validation report)
                verify_all.py    (1.1 -> 2.x end-to-end health check)
-               make_sample_data.py (stub NO2 wind CSVs)
+               make_sample_data.py (offline stub NO2 wind CSVs)
 config/        app.toml, limits.toml
 data/          uploads/ (input CSVs), cache/ (Optimeering responses), iar.db
 tests/         pytest suite (73 tests)
