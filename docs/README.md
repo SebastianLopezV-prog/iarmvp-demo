@@ -93,7 +93,7 @@ upper-tail quantile of the summed cost; CIaR is the mean beyond it.
 
 ## Status
 
-**Week 1 (ingestion + storage) and Week 2 (Monte Carlo engine) COMPLETE — 67 tests passing.**
+**Week 1 (ingestion + storage) and Week 2 (Monte Carlo engine) COMPLETE — 73 tests passing.**
 
 - **Week 1 (1.1–1.5):** package skeleton; SQLite schema; Optimeering forecast client
   (live, cached, retry); flat-file loaders + validation; end-to-end ingest pipeline.
@@ -103,13 +103,15 @@ upper-tail quantile of the summed cost; CIaR is the mean beyond it.
   of runs/results; validation (analytic Normal, 1/√N convergence, reproducibility,
   summed-quantile-vs-naive — see `docs/validation.md`).
 
-**Open item — NO2 day-ahead/spot price source (blocks *real* Gross IaR; Spread IaR is fine).**
-Optimeering's public catalogue (625 series, all areas) is balancing-market only — it
-publishes the imbalance *spread* (`imbalance_price − spot`), not the spot price itself.
-Spread IaR uses the spread directly; **Gross IaR needs the spot price added back**, which
-is currently a **synthetic stub** (`dam_prices` table / `TODO(dam-source)`). A real feed
-(Optimeering internal access via OAuth, ENTSO-E, or Nord Pool) writes the same table with
-no downstream change. See `CLAUDE.md` for the full investigation.
+**DAM/spot price — RESOLVED.** The public SDK has no spot price, but the **internal**
+`optipyclient` SDK's `MarketsApi` serves the **DAM cleared price** (the spot) — wired in via
+`iar/ingestion/markets_client.py` and stored in the `dam_prices` table. `run_iar.py` now
+computes **real Gross IaR** over the MTUs where both the live spread and the real DAM price
+exist. *(Requires the vendored wheel — see Setup above.)*
+
+**Remaining caveat:** the **portfolio** (positions/generation) and the imbalance-model
+`sigma` are still stubs, so absolute euro figures stay illustrative until real portfolio
+files are loaded and `sigma` is calibrated (Week 3).
 
 **Next — Week 3 (`iar/risk/`):** backtesting (join settled cost to the IaR estimate whose
 `vintage_ts` precedes it; Kupiec POF test), sigma recalibration, and alerts.
