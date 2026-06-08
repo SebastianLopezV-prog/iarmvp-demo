@@ -51,6 +51,8 @@ def parse_args() -> argparse.Namespace:
     ap.add_argument("--dist", choices=["normal", "student_t"], default="normal",
                     help="imbalance distribution shape")
     ap.add_argument("--seed", type=int, default=42, help="RNG seed (reproducibility)")
+    ap.add_argument("--store", action="store_true",
+                    help="persist the run to data/iar.db (SimulationRun + IaRResult)")
     return ap.parse_args()
 
 
