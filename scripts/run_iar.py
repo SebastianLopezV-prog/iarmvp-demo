@@ -120,6 +120,21 @@ def main() -> None:
     print("CIaR = average cost in the worst (1 - confidence) tail.")
     print("NOTE: spread is LIVE; portfolio + spot price are STUBS -> figures illustrative.")
 
+    if args.store:
+        init_db()
+        with get_session() as s:
+            pf = get_or_create_portfolio(s, "MC Runner", f"{args.area} Wind", args.area)
+            v = datetime.fromisoformat(vintage) if vintage else datetime.now(timezone.utc)
+            run = persist_report(
+                s, rep, pf.portfolio_id, vintage_ts=v, horizon=f"{n_mtus}xPT15M",
+                extra_config={"area": args.area, "dist": args.dist,
+                              "sigma_fraction": args.sigma_fraction},
+            )
+            s.commit()
+            print(bar)
+            print(f"[stored] SimulationRun #{run.run_id} (portfolio #{pf.portfolio_id}) "
+                  f"+ 2 IaRResult rows -> {DEFAULT_DB_PATH}")
+
 
 if __name__ == "__main__":
     main()
