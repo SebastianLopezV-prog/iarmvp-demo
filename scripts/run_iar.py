@@ -186,7 +186,8 @@ def main() -> None:
           f"scenarios={rep.n_scenarios:,}  confidence={rep.confidence:.0%}")
     print(f"forecast vintage : {vintage}   (LIVE Optimeering spread)")
     print(f"DAM spot price   : {dam_src}")
-    print(f"imbalance model  : {args.dist}, sigma={args.sigma_fraction:.0%} of capacity  [STUB portfolio]")
+    print(f"portfolio        : {pf_src}")
+    print(f"imbalance model  : {args.dist}, sigma={args.sigma_fraction:.0%} of capacity")
     print(bar)
     for name, m in (("GROSS ", rep.gross), ("SPREAD", rep.spread)):
         print(f"{name} | IaR = {m.iar:+12,.0f} EUR   "
@@ -194,7 +195,8 @@ def main() -> None:
     print(bar)
     print("IaR = worst-case settlement cost at the confidence level (positive = cost).")
     print("CIaR = average cost in the worst (1 - confidence) tail.")
-    print("NOTE: spread + DAM spot are LIVE; portfolio (positions/generation) is still a STUB.")
+    print("NOTE: spread + DAM spot LIVE; positions/generation REAL (windsim) when loaded; "
+          "only the imbalance sigma remains a parametric stub (calibrated in Week 3).")
 
     if args.store:
         init_db()
