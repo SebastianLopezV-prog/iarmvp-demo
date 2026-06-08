@@ -81,6 +81,22 @@ Auth reuses the same `OPTIMEERING_API_KEY` (no OAuth needed). **Without this whe
 markets client raises a clear error and `run_iar.py` falls back to a flat `--dam-price`
 stub (Spread IaR is unaffected; only real Gross IaR needs it).
 
+### Optional — real portfolio data via `windsim`
+
+Real positions/generation/actuals come from Volue's wind-portfolio simulator,
+**`windsim`** (in `Volue/sirius-imb-at-risk-mvp`, also private — not on PyPI). Install it
+from the repo, then ingest a portfolio **the client way** (it generates the data, writes
+the three upload CSVs, and loads them through the flat-file loaders into `data/iar.db`):
+
+```powershell
+.\venv\Scripts\python.exe -m pip install "git+https://github.com/Volue/sirius-imb-at-risk-mvp.git"
+.\venv\Scripts\python.exe scripts\load_windsim_data.py --windsim-portfolio north --area NO2
+```
+
+`run_iar.py` then uses these REAL positions automatically (it reads them from the DB and
+simulates over the MTUs where the live spread, real DAM price, and real positions overlap).
+Without it, `run_iar.py` falls back to a synthetic stub portfolio.
+
 ## Run
 
 ```powershell
