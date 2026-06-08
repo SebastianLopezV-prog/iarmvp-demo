@@ -62,6 +62,12 @@ from optimeering import (
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CACHE_DIR = PROJECT_ROOT / "data" / "cache"
 
+# Optimeering PRODUCTION host. The public ``optimeering`` SDK already defaults to this,
+# but we pin it explicitly: the *internal* SDK defaults to **staging**, which Volue-group
+# accounts cannot reach. Pinning prevents a silent switch to an inaccessible host.
+# Override with the OPTIMEERING_HOST env var (or the ``host`` arg) if ever needed.
+DEFAULT_HOST = "https://app.optimeering.com"
+
 # Status codes worth retrying (transient server/throttling errors).
 _TRANSIENT_STATUS = {429, 500, 502, 503, 504}
 
