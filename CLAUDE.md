@@ -117,7 +117,8 @@ iar_mvp/
 ## Current status (Week 2 COMPLETE)
 
 Environment: Windows, Python 3.13, venv at `venv/` (use `.\venv\Scripts\python.exe`).
-Package installed editable (`pip install -e ".[dev]"`). **67 tests passing.**
+Package installed editable (`pip install -e ".[dev]"`). **73 tests passing.**
+Real DAM (spot) price needs the vendored `optipyclient` wheel in `vendor/` (README Setup).
 (Note: the Read tool can't render PDFs here — `pdftoppm` is missing; extract PDF text with
 `pypdf` instead.)
 
