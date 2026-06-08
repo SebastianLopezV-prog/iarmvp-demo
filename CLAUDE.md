@@ -208,6 +208,16 @@ Run commands:
 Engine sign convention: `cost = imbalance × price` (positive = cost/bad); IaR is the
 upper-tail quantile of summed cost, CIaR the mean beyond it.
 
+**REAL portfolio data via `windsim`.** Positions/generation/actuals now come from Volue's
+wind-portfolio simulator `windsim` (repo `Volue/sirius-imb-at-risk-mvp`, private, install
+from git — not PyPI). `scripts/load_windsim_data.py` generates it and ingests it **the
+client way**: windsim DuckDB → `data/uploads/*.csv` → flat-file loaders → `iar.db`
+(bids.cleared_mw → DAM position; latest forecast summed over parks → gen; actuals summed →
+actual; all MW×0.25 = MWh/MTU). `run_iar.py` reads these real positions from the DB and
+simulates over the live-spread ∩ real-DAM ∩ real-position MTUs, falling back to the stub
+portfolio if none loaded. **Now real: spread, DAM spot, AND positions — only the imbalance
+`sigma` is still a parametric stub (Week-3 calibration).**
+
 **DAM/spot price — RESOLVED (was the big open item).** The internal SDK is **`optipyclient`**
 (from `Volue/sirius-prime` Releases, a vendored wheel — NOT PyPI). Its `MarketsApi` serves
 settled market data incl. the **DAM cleared price** = spot. It authenticates with the **same
