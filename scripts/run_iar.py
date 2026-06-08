@@ -23,12 +23,16 @@ from __future__ import annotations
 
 import argparse
 from collections import defaultdict
+from datetime import datetime, timezone
 
 import numpy as np
 
+from iar.db.session import DEFAULT_DB_PATH, get_session, init_db
+from iar.ingestion.flatfile_loader import get_or_create_portfolio
 from iar.ingestion.optimeering_client import OptimeeringForecastClient
 from iar.simulation.engine import EngineConfig, run_simulation
 from iar.simulation.imbalance_model import ImbalanceModel, ImbalanceModelConfig
+from iar.simulation.persistence import persist_report
 from iar.simulation.price_sampler import QuantilePriceSampler
 
 MTU_HOURS = 0.25  # 15-minute MTU
