@@ -100,6 +100,7 @@ class OptimeeringForecastClient:
         api_key: str | None = None,
         cache_dir: str | Path = DEFAULT_CACHE_DIR,
         load_env: bool = True,
+        host: str | None = None,
     ) -> None:
         if load_env:
             load_dotenv(dotenv_path=PROJECT_ROOT / ".env")
@@ -108,8 +109,12 @@ class OptimeeringForecastClient:
             raise MissingApiKeyError(
                 "OPTIMEERING_API_KEY not found. Add it to .env (never commit it)."
             )
+        # Pin the production host (see DEFAULT_HOST) so we never silently hit staging.
+        self.host = host or os.getenv("OPTIMEERING_HOST") or DEFAULT_HOST
         # Build the SDK client. The key is held only inside the SDK config.
-        self._api = PredictionsApi(OptimeeringClient(configuration=Configuration(api_key=key)))
+        self._api = PredictionsApi(
+            OptimeeringClient(configuration=Configuration(host=self.host, api_key=key))
+        )
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
