@@ -207,22 +207,14 @@ Run commands:
 Engine sign convention: `cost = imbalance × price` (positive = cost/bad); IaR is the
 upper-tail quantile of summed cost, CIaR the mean beyond it.
 
-**OPEN ITEM — NO2 day-ahead/spot price source (blocks *real* Gross IaR; Spread IaR is fine):**
-The public Optimeering SDK has no spot series (above). Options being chased, unresolved:
-- **Optimeering internal access via OAuth.** Colleagues say "use the internal SDK, you have
-  access." Findings so far: the docs they sent are the *public* SDK (`pip install optimeering`,
-  production default, OAuth + API-key). OAuth = `az login --scope api://app.optimeering.com/.default
-  --tenant optimeering.com` (Azure tenant `d23844a4-...`), then a default `OptimeeringClient()`
-  uses your identity (the **"Auth Volue Internal"** group). BUT the access screenshot shows a
-  `GET_markets` operation that **does not exist in this SDK** (no "market" anywhere; PredictionsApi
-  only has list_series/retrieve/...). So internal data may be a **separate package/API**, not this
-  one. **Awaiting colleague confirmation:** same package via OAuth, or a separate internal feed —
-  and does NO2 spot come from `GET_markets` or extra OAuth-visible series? (Azure CLI not installed
-  on the dev machine yet; can't test OAuth here.)
-- **External fallback:** ENTSO-E Transparency Platform (free token; NO2 EIC `10YNO-2--------T`,
-  day-ahead docType `A44`) or Nord Pool API (licensed). Either writes the `dam_prices` table.
-- Our wrapper is currently **hardwired to API-key**; switching to OAuth needs a small client tweak
-  (not yet done — user asked not to recode pending clarification).
+**DAM/spot price — RESOLVED (was the big open item).** The internal SDK is **`optipyclient`**
+(from `Volue/sirius-prime` Releases, a vendored wheel — NOT PyPI). Its `MarketsApi` serves
+settled market data incl. the **DAM cleared price** = spot. It authenticates with the **same
+API key** (no OAuth/`az login` needed after all). Wired in (`markets_client.py`), real Gross
+IaR works. The earlier OAuth/`GET_markets` thread was a detour — the wheel was the answer.
+Setup REQUIRES installing the wheel into `vendor/` (see README → Setup). Note: `optipyclient`
+also exposes the **absolute imbalance price** (`market='Imbalance', series_type='imbalance
+price'`) and many other series — useful for the Week-3 backtest (realised actuals).
 
 **NEXT: Week 3** — risk/alerts + backtesting (`iar/risk/`). Backtest joins each settled
 period's realised cost to the IaR estimate whose `vintage_ts` precedes it; Kupiec POF test
