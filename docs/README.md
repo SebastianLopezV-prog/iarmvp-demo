@@ -40,7 +40,7 @@ scripts/       run_pipeline.py  (ingest -> store smoke path)
                make_sample_data.py (stub NO2 wind CSVs)
 config/        app.toml, limits.toml
 data/          uploads/ (input CSVs), cache/ (Optimeering responses), iar.db
-tests/         pytest suite (67 tests)
+tests/         pytest suite (73 tests)
 docs/          README.md, data_contract.md, assumptions.md, validation.md
 ```
 
