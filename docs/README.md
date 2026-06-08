@@ -128,9 +128,12 @@ upper-tail quantile of the summed cost; CIaR is the mean beyond it.
 computes **real Gross IaR** over the MTUs where both the live spread and the real DAM price
 exist. *(Requires the vendored wheel — see Setup above.)*
 
-**Remaining caveat:** the **portfolio** (positions/generation) and the imbalance-model
-`sigma` are still stubs, so absolute euro figures stay illustrative until real portfolio
-files are loaded and `sigma` is calibrated (Week 3).
+**Portfolio data — now REAL too.** Positions/generation/actuals can come from Volue's
+`windsim` simulator, ingested through the **client CSV path** (`load_windsim_data.py` →
+`data/uploads/*.csv` → flat-file loaders → `dam_prices`/positions tables). `run_iar.py`
+picks them up from the DB automatically. So spread, DAM spot, **and** positions are now
+real; the **only remaining stub is the imbalance-model `sigma`** (the forecast-error size),
+which is calibrated against realised outcomes in Week 3.
 
 **Next — Week 3 (`iar/risk/`):** backtesting (join settled cost to the IaR estimate whose
 `vintage_ts` precedes it; Kupiec POF test), sigma recalibration, and alerts.
