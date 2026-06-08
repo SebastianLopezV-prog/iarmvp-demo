@@ -194,3 +194,28 @@ def load_dam_prices(
     session.add_all(rows)
     session.flush()
     return len(rows)
+
+
+def store_dam_price_records(
+    session: Session,
+    price_area: str,
+    records: list[dict],
+    replace: bool = True,
+) -> int:
+    """Persist DAM price records (e.g. from ``markets_client.get_dam_prices``).
+
+    ``records`` are dicts with ``timestamp`` (ISO 8601) and ``eur_per_mwh``. Writes to
+    the same ``dam_prices`` table as :func:`load_dam_prices`; replaces existing rows for
+    the area by default. Duplicate timestamps are de-duplicated (last write wins).
+    """
+    if replace:
+        session.query(DAMPrice).filter(DAMPrice.price_area == price_area).delete()
+
+    by_ts: dict = {}
+    for r in records:
+        ts = pd.to_datetime(r["timestamp"], utc=True).to_pydatetime()
+        by_ts[ts] = float(r["eur_per_mwh"])
+    rows = [DAMPrice(price_area=price_area, timestamp=ts, price=p) for ts, p in by_ts.items()]
+    session.add_all(rows)
+    session.flush()
+    return len(rows)
