@@ -48,7 +48,7 @@ def _verdict(res: BacktestResult) -> str:
     return "n/a" if wc is None else ("CALIBRATED" if wc else "MIS-CALIBRATED")
 
 
-def _print_result(res: BacktestResult, persisted: bool) -> None:
+def _print_result(res: BacktestResult, persist_note: str) -> None:
     bar = "-" * 64
     k = res.kupiec
     conf = f"{res.confidence:.0%}" if res.confidence is not None else "n/a"
@@ -71,7 +71,7 @@ def _print_result(res: BacktestResult, persisted: bool) -> None:
           f"(observed {k.observed_rate:.0%}, expected ~{k.expected_rate:.0%})")
     print(f"Kupiec POF     : LR={lr}  p-value={pv}  ->  {_verdict(res)} "
           f"(alpha={k.significance:.0%})")
-    print(f"records        : {'persisted' if persisted else 'NOT persisted (--no-persist)'}")
+    print(f"records        : {persist_note}")
 
 
 def main() -> None:
