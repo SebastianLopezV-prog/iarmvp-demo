@@ -43,7 +43,7 @@ from iar.ingestion.flatfile_loader import (
 from iar.ingestion.markets_client import OptimeeringMarketsClient
 from iar.ingestion.optimeering_client import OptimeeringForecastClient
 from iar.risk.backtest import estimate_for_period, iar_estimate_for_period, run_backtest
-from iar.risk.realised_cost import compute_realised_cost, realised_period_cost
+from iar.risk.realised_cost import compute_realised_cost
 from iar.risk.replay import backfill_iar
 from iar.simulation.engine import EngineConfig, run_simulation
 from iar.simulation.imbalance_model import ImbalanceModel, ImbalanceModelConfig
