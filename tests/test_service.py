@@ -146,7 +146,7 @@ def test_get_limit_status_reports_severity_and_headroom(session):
     assert by_type.loc["gross", "severity"] == "hard"
     assert by_type.loc["gross", "limit_value"] == 50000
     assert by_type.loc["gross", "utilisation"] == pytest.approx(1.2)
-    assert by_type.loc["spread", "severity"] is None
+    assert pd.isna(by_type.loc["spread", "severity"])  # within limit -> no severity
 
 
 def test_get_limit_status_empty_without_runs(session):
