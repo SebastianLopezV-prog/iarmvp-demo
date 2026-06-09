@@ -44,6 +44,7 @@ from iar.ingestion.markets_client import OptimeeringMarketsClient
 from iar.ingestion.optimeering_client import OptimeeringForecastClient
 from iar.risk.alerts import classify_severity, load_limits
 from iar.risk.backtest import estimate_for_period, iar_estimate_for_period, run_backtest
+from iar.risk.calibration import calibrate_sigma
 from iar.risk.realised_cost import compute_realised_cost
 from iar.risk.replay import backfill_iar
 from iar.simulation.engine import EngineConfig, run_simulation
