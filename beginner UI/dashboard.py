@@ -270,7 +270,7 @@ def tag(real: bool) -> str:
     return "🟢 LIVE/REAL" if real else "🔴 STUB"
 
 
-tab_live, tab_bt = st.tabs(["📉 Live IaR", "🔁 Backtest (3.1 + 3.2)"])
+tab_live, tab_bt = st.tabs(["📉 Live IaR", "🔁 Backtest (3.1–3.3)"])
 
 # =========================================================================== #
 # TAB 1 — Live IaR (existing functionality)
