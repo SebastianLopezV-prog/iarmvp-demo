@@ -46,3 +46,14 @@ team decision before/while building the engine. See `data_contract.md` for detai
 - Fat-tail modelling beyond the supplied quantiles.
 - Multi-area netting, intraday/balancing positions, live trading integration,
   regulatory reporting, cloud deployment.
+
+## Week-4 UI scope decisions
+
+- **No per-MTU/hour IaR heatmap.** The mockup shows a colour-coded MTU/hour risk
+  heatmap, but the engine emits a single *period* IaR (not a per-MTU IaR series),
+  so a faithful heatmap isn't supported. The dashboard substitutes the per-MTU
+  **realised cost** and the **spread fan** views instead. A true per-MTU IaR
+  heatmap is post-MVP (needs the engine to emit per-MTU IaR).
+- **Limit status is computed on read** (`service.get_limit_status`) rather than
+  only from persisted alerts, so the IaR-vs-limit line always reflects the latest
+  run. Persisted `Alert` rows (written by `run_iar.py --store`) back the audit history.
