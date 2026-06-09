@@ -427,7 +427,6 @@ with tab_bt:
     if realised.empty:
         st.info("No realised cost yet (needs actual delivery + actual imbalance price + DAM price).")
     else:
-        period = realised_period_cost.__wrapped__ if hasattr(realised_period_cost, "__wrapped__") else None
         tot_gross = float(realised["gross_cost"].sum())
         tot_spread = float(realised["spread_cost"].sum())
         rc1, rc2, rc3 = st.columns(3)
