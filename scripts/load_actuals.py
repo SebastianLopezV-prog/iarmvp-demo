@@ -125,7 +125,7 @@ def main() -> None:
     cols = ["timestamp", "imbalance_mwh", "actual_imbalance_price", "gross_cost", "spread_cost"]
     print(df[cols].head(8).to_string(index=False))
     print(bar)
-    print("Sign convention: imbalance = DAM position − actual delivery; "
+    print("Sign convention: imbalance = DAM position - actual delivery; "
           "positive cost = bad. Feeds the 3.3 backtest (iar.risk.backtest.run_backtest).")
 
 
