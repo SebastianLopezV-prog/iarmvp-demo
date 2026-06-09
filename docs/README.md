@@ -47,19 +47,23 @@ iar/
                flatfile_loader.py (CSV/Excel + DAM-price store)
   simulation/  imbalance_model.py (2.1), price_sampler.py (2.2), engine.py (2.3),
                persistence.py (2.4)
-  risk/        alerts.py, backtest.py        (Week 3 — not yet built)
-  service.py   backend interface for the UI (Week 3)
-app/           Streamlit dashboard (UI only — skeleton for service.py)
+  risk/        realised_cost.py (3.1), replay.py (3.2), backtest.py (3.2/3.3),
+               alerts.py (3.4), calibration.py (sigma calibration)
+  service.py   backend interface for the UI (3.5) — frozen read API
+app/           Streamlit dashboard (UI only — skeleton for service.py; built in 4.1)
 beginner UI/   dashboard.py — demo risk dashboard (committed; needs the deps above)
 scripts/       run_pipeline.py  (ingest -> store smoke path)
-               run_iar.py       (run the Monte Carlo, print/store IaR)
+               run_iar.py       (run the Monte Carlo, print/store IaR + alerts)
                load_windsim_data.py (REAL portfolio data via the client CSV path)
-               validate_engine.py (2.5 validation report)
-               verify_all.py    (1.1 -> 2.x end-to-end health check)
-               make_sample_data.py (offline stub NO2 wind CSVs)
+               load_actuals.py  (3.1 — realised prices + realised cost)
+               backfill_iar.py  (3.2 — backfill day-ahead IaR vintages)
+               run_backtest.py  (3.3 — exceedances + Kupiec)
+               calibrate_sigma.py (sweep sigma against the backtest)
+               seed_demo.py     (clean one-portfolio-per-area demo: NO1/NO2/SE3)
+               validate_engine.py / verify_all.py / make_sample_data.py
 config/        app.toml, limits.toml
 data/          uploads/ (input CSVs), cache/ (Optimeering responses), iar.db
-tests/         pytest suite (73 tests)
+tests/         pytest suite (142 tests — hermetic: no key/network/wheel needed)
 docs/          README.md, data_contract.md, assumptions.md, validation.md
 ```
 
