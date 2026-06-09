@@ -183,8 +183,58 @@ def get_iar_curve(
 # --------------------------------------------------------------------------- #
 # Alerts (3.4) and backtest (3.1–3.3)
 # --------------------------------------------------------------------------- #
+def get_limit_status(
+    portfolio_id: int,
+    limit_type: str = "remaining_day",
+    *,
+    session: Session | None = None,
+) -> pd.DataFrame:
+    """Latest run's IaR vs configured limits — current headroom + severity.
+
+    Computed on read (no writes), so the dashboard can draw the IaR-vs-limit line
+    and show 🟢/🟠/🔴 status without relying on persisted alerts. Columns
+    ``[iar_type, limit_type, iar_value, limit_value, utilisation, severity]``;
+    ``severity`` is ``None`` when within limit. Empty if no run or no limits config.
+    """
+    empty = pd.DataFrame(
+        columns=["iar_type", "limit_type", "iar_value", "limit_value", "utilisation", "severity"]
+    )
+    with _scope(session) as s:
+        run = (
+            s.query(SimulationRun)
+            .filter_by(portfolio_id=portfolio_id)
+            .order_by(SimulationRun.run_ts.desc(), SimulationRun.run_id.desc())
+            .first()
+        )
+        if run is None:
+            return empty
+        try:
+            config = load_limits()
+        except FileNotFoundError:
+            return empty
+        checks = check_run(run, config, limit_type)
+        return pd.DataFrame(
+            [
+                {
+                    "iar_type": c.iar_type,
+                    "limit_type": c.limit_type,
+                    "iar_value": c.iar_value,
+                    "limit_value": c.limit_value,
+                    "utilisation": c.utilisation,
+                    "severity": c.severity,
+                }
+                for c in checks
+            ],
+            columns=["iar_type", "limit_type", "iar_value", "limit_value", "utilisation", "severity"],
+        )
+
+
 def get_alerts(portfolio_id: int, *, session: Session | None = None) -> pd.DataFrame:
-    """Persisted limit-breach alerts for a portfolio (newest first)."""
+    """Persisted limit-breach alerts for a portfolio (newest first).
+
+    Populated whenever a run is stored (``run_iar.py --store`` evaluates limits).
+    For the *current* live status use :func:`get_limit_status` instead.
+    """
     with _scope(session) as s:
         return load_alerts(s, portfolio_id)
 
