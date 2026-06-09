@@ -32,7 +32,7 @@ from sqlalchemy.orm import Session
 
 from iar.db.models import IaRResult, Portfolio, SimulationRun
 from iar.db.session import get_session, init_db
-from iar.risk.alerts import load_alerts
+from iar.risk.alerts import check_run, load_alerts, load_limits
 from iar.risk.backtest import run_backtest
 
 __all__ = [
@@ -40,6 +40,7 @@ __all__ = [
     "get_portfolio",
     "get_latest_iar",
     "get_iar_curve",
+    "get_limit_status",
     "get_alerts",
     "get_backtest_summary",
 ]
