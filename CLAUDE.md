@@ -124,11 +124,13 @@ Real DAM (spot) price needs the vendored `optipyclient` wheel in `vendor/` (READ
 
 Run commands (Week 2):
 ```
+.\venv\Scripts\python.exe scripts\load_windsim_data.py  # ingest REAL portfolio (client CSV path)
 .\venv\Scripts\python.exe scripts\run_iar.py            # run the MC, print Gross/Spread IaR+CIaR
 .\venv\Scripts\python.exe scripts\run_iar.py --store    # ...and persist the run to data/iar.db
 .\venv\Scripts\python.exe scripts\validate_engine.py    # 2.5 validation report (8/8 checks)
 .\venv\Scripts\python.exe scripts\verify_all.py         # 1.1->2.x end-to-end health check
-.\venv\Scripts\python.exe -m pytest -q                  # full suite (67 tests)
+.\venv\Scripts\python.exe -m streamlit run "beginner UI\dashboard.py"   # demo dashboard
+.\venv\Scripts\python.exe -m pytest -q                  # full suite (73 tests)
 ```
 
 **Week 1 COMPLETE (1.1–1.5), all tested and verified against the live Optimeering API:**
