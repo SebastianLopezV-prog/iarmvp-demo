@@ -248,3 +248,171 @@ def test_get_imbalance_prices_no_series_raises():
     client = OptimeeringMarketsClient(_api=api)
     with pytest.raises(LookupError, match="imbalance price"):
         client.get_imbalance_prices("NO2")
+
+
+# --------------------------------------------------------------------------- #
+# Kupiec POF test (Task 3.3) — pure, no DB
+# --------------------------------------------------------------------------- #
+def test_kupiec_perfectly_calibrated_is_zero():
+    k = kupiec_pof(n_obs=100, n_exceedances=5, expected_rate=0.05)
+    assert k.lr_statistic == pytest.approx(0.0, abs=1e-9)
+    assert k.p_value == pytest.approx(1.0, abs=1e-6)
+    assert k.reject_h0 is False
+    assert k.well_calibrated is True
+
+
+def test_kupiec_too_many_exceedances_rejects():
+    # 25 breaches in 250 obs (10%) vs an expected 5% -> mis-calibrated.
+    k = kupiec_pof(n_obs=250, n_exceedances=25, expected_rate=0.05)
+    assert k.lr_statistic == pytest.approx(10.33, abs=0.2)
+    assert k.p_value < 0.05
+    assert k.reject_h0 is True
+    assert k.well_calibrated is False
+
+
+def test_kupiec_zero_exceedances_is_positive_stat():
+    # Zero breaches over 100 obs is *too few* at 5% -> non-trivial statistic.
+    k = kupiec_pof(n_obs=100, n_exceedances=0, expected_rate=0.05)
+    assert k.lr_statistic > 0
+    assert k.observed_rate == 0.0
+
+
+def test_kupiec_no_observations_is_none_safe():
+    k = kupiec_pof(n_obs=0, n_exceedances=0, expected_rate=0.05)
+    assert k.lr_statistic is None and k.p_value is None
+    assert k.reject_h0 is None and k.well_calibrated is None
+
+
+def test_kupiec_bad_expected_rate_raises():
+    with pytest.raises(ValueError, match="expected_rate"):
+        kupiec_pof(n_obs=10, n_exceedances=1, expected_rate=1.5)
+
+
+# --------------------------------------------------------------------------- #
+# End-to-end backtest (Task 3.3) — exceedance flagging + persistence
+# --------------------------------------------------------------------------- #
+def _insert_replay_run(session, pid, day_start, gross_iar, spread_iar, confidence=0.95):
+    """Insert a stored day-ahead estimate (run + gross/spread results) for a day."""
+    day_end = day_start + timedelta(days=1)
+    vintage = day_start - timedelta(hours=12)
+    run = SimulationRun(
+        portfolio_id=pid, run_ts=vintage, vintage_ts=vintage,
+        n_scenarios=5000, seed=42,
+        config_json=json.dumps({
+            "replay": True,
+            "period_start": day_start.isoformat(),
+            "period_end": day_end.isoformat(),
+            "n_mtus": 1,
+        }),
+    )
+    session.add(run)
+    session.flush()
+    horizon = day_start.date().isoformat()
+    session.add(IaRResult(run_id=run.run_id, confidence=confidence, horizon=horizon,
+                          iar_type="gross", iar_value=gross_iar, ciar_value=gross_iar))
+    session.add(IaRResult(run_id=run.run_id, confidence=confidence, horizon=horizon,
+                          iar_type="spread", iar_value=spread_iar, ciar_value=spread_iar))
+    session.flush()
+    return horizon
+
+
+def _insert_realised(session, pid, area, day_start, *, dam_pos, actual, imb_price, dam_price):
+    """Insert one settled MTU at ``day_start`` producing a known realised cost."""
+    session.add(DAMPosition(portfolio_id=pid, timestamp=day_start, mwh=dam_pos))
+    session.add(ActualDelivery(portfolio_id=pid, timestamp=day_start, actual_mwh=actual))
+    session.add(ActualImbalancePrice(price_area=area, timestamp=day_start, price=imb_price))
+    session.add(DAMPrice(price_area=area, timestamp=day_start, price=dam_price))
+    session.flush()
+
+
+D1 = datetime(2026, 6, 8, tzinfo=timezone.utc)
+D2 = datetime(2026, 6, 9, tzinfo=timezone.utc)
+D3 = datetime(2026, 6, 10, tzinfo=timezone.utc)
+
+
+def _three_day_backtest_setup(session):
+    pf = get_or_create_portfolio(session, "Wind Co", "NO2 Wind", "NO2")
+    pid = pf.portfolio_id
+    # Estimates: gross IaR = 500 each day.
+    _insert_replay_run(session, pid, D1, gross_iar=500.0, spread_iar=300.0)
+    _insert_replay_run(session, pid, D2, gross_iar=500.0, spread_iar=300.0)
+    _insert_replay_run(session, pid, D3, gross_iar=500.0, spread_iar=300.0)
+    # D1 realised: short 20 MWh @ 100 -> gross 2000 > 500 -> EXCEEDED.
+    _insert_realised(session, pid, "NO2", D1, dam_pos=20.0, actual=0.0, imb_price=100.0, dam_price=40.0)
+    # D2 realised: short 1 MWh @ 100 -> gross 100 < 500 -> within.
+    _insert_realised(session, pid, "NO2", D2, dam_pos=1.0, actual=0.0, imb_price=100.0, dam_price=40.0)
+    # D3: no realised inputs -> not settled -> skipped.
+    session.commit()
+    return pid
+
+
+def test_backtest_flags_exceedances_and_skips_unsettled(session):
+    pid = _three_day_backtest_setup(session)
+    res = run_backtest(session, pid, "gross")
+    assert res.n_periods == 2          # D3 skipped (unsettled)
+    assert res.n_exceedances == 1      # only D1
+    by_period = {p.period: p for p in res.periods}
+    assert by_period["2026-06-08"].exceeded is True
+    assert by_period["2026-06-09"].exceeded is False
+    assert by_period["2026-06-08"].realised_cost == pytest.approx(2000.0)
+
+
+def test_backtest_kupiec_uses_estimate_confidence(session):
+    pid = _three_day_backtest_setup(session)
+    res = run_backtest(session, pid, "gross")
+    assert res.confidence == 0.95
+    assert res.kupiec.expected_rate == pytest.approx(0.05)
+    assert res.kupiec.observed_rate == pytest.approx(0.5)  # 1 of 2
+    assert res.kupiec.n_obs == 2
+
+
+def test_backtest_persists_one_record_per_period(session):
+    pid = _three_day_backtest_setup(session)
+    run_backtest(session, pid, "gross", persist=True)
+    session.commit()
+    recs = session.query(HistoricalPerformanceRecord).filter_by(portfolio_id=pid).all()
+    assert len(recs) == 2
+    assert all(r.kupiec_stat is not None for r in recs)
+    df = load_performance_records(session, pid)
+    assert set(df["period"]) == {"2026-06-08", "2026-06-09"}
+    assert bool(df.set_index("period").loc["2026-06-08", "exceeded"]) is True
+
+
+def test_backtest_persist_is_idempotent(session):
+    pid = _three_day_backtest_setup(session)
+    run_backtest(session, pid, "gross", persist=True, replace=True)
+    run_backtest(session, pid, "gross", persist=True, replace=True)
+    session.commit()
+    assert session.query(HistoricalPerformanceRecord).filter_by(portfolio_id=pid).count() == 2
+
+
+def test_backtest_persist_false_writes_nothing(session):
+    pid = _three_day_backtest_setup(session)
+    run_backtest(session, pid, "gross", persist=False)
+    assert session.query(HistoricalPerformanceRecord).filter_by(portfolio_id=pid).count() == 0
+
+
+def test_backtest_spread_basis(session):
+    pid = _three_day_backtest_setup(session)
+    # D1 spread realised = 20*(100-40)=1200 > 300 -> exceeded; D2 = 1*60=60 < 300.
+    res = run_backtest(session, pid, "spread")
+    by_period = {p.period: p for p in res.periods}
+    assert by_period["2026-06-08"].exceeded is True
+    assert by_period["2026-06-08"].realised_cost == pytest.approx(1200.0)
+    assert by_period["2026-06-09"].exceeded is False
+
+
+def test_backtest_no_settled_periods_is_empty(session):
+    pf = get_or_create_portfolio(session, "Wind Co", "NO2 Wind", "NO2")
+    _insert_replay_run(session, pf.portfolio_id, D1, gross_iar=500.0, spread_iar=300.0)
+    session.commit()
+    res = run_backtest(session, pf.portfolio_id, "gross")
+    assert res.n_periods == 0
+    assert res.kupiec.well_calibrated is None
+    assert res.as_frame().empty
+
+
+def test_backtest_rejects_bad_iar_type(session):
+    pf = get_or_create_portfolio(session, "Wind Co", "NO2 Wind", "NO2")
+    with pytest.raises(ValueError, match="gross.*spread"):
+        run_backtest(session, pf.portfolio_id, "net")
