@@ -27,6 +27,7 @@ from sqlalchemy.orm import Session
 
 from iar.db.models import (
     ActualDelivery,
+    ActualImbalancePrice,
     DAMPosition,
     DAMPrice,
     GenerationForecast,
