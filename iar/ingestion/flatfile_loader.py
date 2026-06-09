@@ -220,3 +220,74 @@ def store_dam_price_records(
     session.add_all(rows)
     session.flush()
     return len(rows)
+
+
+# --------------------------------------------------------------------------- #
+# Actual (realised) imbalance price — backtest input (Task 3.1)
+# --------------------------------------------------------------------------- #
+def load_actual_imbalance_prices(
+    session: Session,
+    price_area: str,
+    path: str | Path,
+    replace: bool = True,
+) -> int:
+    """Load realised imbalance prices (``timestamp``, ``eur_per_mwh``) for an area.
+
+    The **absolute** TSO-published imbalance price per MTU (EUR/MWh), used by the
+    Week-3 backtest to reconstruct realised settlement cost. Like the other price
+    series it is keyed by ``price_area`` (shared across portfolios), not portfolio.
+
+    This is the **flat-file** path (offline / other sources). The **real** price
+    comes from Optimeering's internal ``MarketsApi`` (imbalance price) — fetch with
+    ``markets_client.OptimeeringMarketsClient.get_imbalance_prices(...)`` and persist
+    with :func:`store_actual_imbalance_price_records`. Both write the same
+    source-agnostic ``actual_imbalance_prices`` table.
+    """
+    path = Path(path)
+    df = _validate(_read_file(path), "eur_per_mwh", path)
+
+    if replace:
+        session.query(ActualImbalancePrice).filter(
+            ActualImbalancePrice.price_area == price_area
+        ).delete()
+
+    rows = [
+        ActualImbalancePrice(
+            price_area=price_area, timestamp=ts.to_pydatetime(), price=float(val)
+        )
+        for ts, val in zip(df["timestamp"], df["eur_per_mwh"])
+    ]
+    session.add_all(rows)
+    session.flush()
+    return len(rows)
+
+
+def store_actual_imbalance_price_records(
+    session: Session,
+    price_area: str,
+    records: list[dict],
+    replace: bool = True,
+) -> int:
+    """Persist realised imbalance prices (e.g. from ``markets_client.get_imbalance_prices``).
+
+    ``records`` are dicts with ``timestamp`` (ISO 8601) and ``eur_per_mwh``. Writes
+    to the same ``actual_imbalance_prices`` table as :func:`load_actual_imbalance_prices`;
+    replaces existing rows for the area by default. Duplicate timestamps are
+    de-duplicated (last write wins).
+    """
+    if replace:
+        session.query(ActualImbalancePrice).filter(
+            ActualImbalancePrice.price_area == price_area
+        ).delete()
+
+    by_ts: dict = {}
+    for r in records:
+        ts = pd.to_datetime(r["timestamp"], utc=True).to_pydatetime()
+        by_ts[ts] = float(r["eur_per_mwh"])
+    rows = [
+        ActualImbalancePrice(price_area=price_area, timestamp=ts, price=p)
+        for ts, p in by_ts.items()
+    ]
+    session.add_all(rows)
+    session.flush()
+    return len(rows)
