@@ -1,13 +1,210 @@
-"""Backend service interface (Task 3.5) — the only thing the UI talks to.
+"""Backend service interface (Task 3.5) — the only module the UI should import.
 
-Placeholder skeleton (Task 1.1). Will expose a small set of read functions over
-SQLAlchemy queries, returning tidy DataFrames/dicts and hiding all DB detail:
+A thin, frozen read API over the database and the risk modules. Every function
+returns **plain data** (tidy ``DataFrame`` / ``dict`` / scalar), never ORM
+objects, so the Streamlit UI stays dumb: it calls these and renders, with no DB
+or simulation logic of its own (architecture: backend separated from UI).
 
-- ``get_latest_iar``
-- ``get_iar_curve``
-- ``get_alerts``
-- ``get_backtest_summary``
+Frozen surface
+--------------
+- :func:`list_portfolios`          — portfolios available to pick.
+- :func:`get_portfolio`            — resolve one by area or id.
+- :func:`get_latest_iar`           — newest run's Gross/Spread IaR + CIaR.
+- :func:`get_iar_curve`            — IaR estimate over time (per stored vintage).
+- :func:`get_alerts`               — persisted limit-breach alerts (3.4).
+- :func:`get_backtest_summary`     — exceedance + Kupiec readout (3.1–3.3).
 
-The Streamlit dashboard imports only from here — it contains no simulation or
-DB logic itself.
+Sessions: each function opens its own session against the default database and
+returns detached data, so callers never manage sessions. Tests (and any caller
+with an isolated DB) may pass an explicit ``session=`` to reuse one instead.
+
+Sign convention is the engine's throughout: IaR/CIaR and realised cost are in
+**cost terms — positive = cost (bad)**.
 """
+
+from __future__ import annotations
+
+from contextlib import contextmanager
+from typing import Iterator
+
+import pandas as pd
+from sqlalchemy.orm import Session
+
+from iar.db.models import IaRResult, Portfolio, SimulationRun
+from iar.db.session import get_session, init_db
+from iar.risk.alerts import load_alerts
+from iar.risk.backtest import run_backtest
+
+__all__ = [
+    "list_portfolios",
+    "get_portfolio",
+    "get_latest_iar",
+    "get_iar_curve",
+    "get_alerts",
+    "get_backtest_summary",
+]
+
+
+@contextmanager
+def _scope(session: Session | None) -> Iterator[Session]:
+    """Use the caller's session if given, else open one on the default DB."""
+    if session is not None:
+        yield session
+    else:
+        init_db()
+        with get_session() as s:
+            yield s
+
+
+# --------------------------------------------------------------------------- #
+# Portfolios
+# --------------------------------------------------------------------------- #
+def list_portfolios(*, session: Session | None = None) -> pd.DataFrame:
+    """All portfolios as ``[portfolio_id, name, price_area]`` (by id)."""
+    with _scope(session) as s:
+        rows = s.query(Portfolio).order_by(Portfolio.portfolio_id).all()
+        return pd.DataFrame(
+            [{"portfolio_id": p.portfolio_id, "name": p.name, "price_area": p.price_area}
+             for p in rows],
+            columns=["portfolio_id", "name", "price_area"],
+        )
+
+
+def get_portfolio(
+    area: str | None = None,
+    portfolio_id: int | None = None,
+    *,
+    session: Session | None = None,
+) -> dict | None:
+    """Resolve one portfolio by ``portfolio_id`` or (latest in) ``area``.
+
+    Returns ``{portfolio_id, name, price_area}`` or ``None`` if not found.
+    """
+    if portfolio_id is None and area is None:
+        raise ValueError("pass either portfolio_id or area")
+    with _scope(session) as s:
+        q = s.query(Portfolio)
+        if portfolio_id is not None:
+            pf = q.filter_by(portfolio_id=portfolio_id).one_or_none()
+        else:
+            pf = (q.filter_by(price_area=area)
+                  .order_by(Portfolio.portfolio_id.desc()).first())
+        if pf is None:
+            return None
+        return {"portfolio_id": pf.portfolio_id, "name": pf.name, "price_area": pf.price_area}
+
+
+# --------------------------------------------------------------------------- #
+# IaR
+# --------------------------------------------------------------------------- #
+def get_latest_iar(portfolio_id: int, *, session: Session | None = None) -> dict | None:
+    """Newest run's Gross/Spread IaR + CIaR for a portfolio (or ``None``).
+
+    Shape::
+
+        {
+            "run_id", "run_ts", "vintage_ts", "horizon",
+            "confidence", "n_scenarios",
+            "gross":  {"iar", "ciar"},
+            "spread": {"iar", "ciar"},
+        }
+    """
+    with _scope(session) as s:
+        run = (
+            s.query(SimulationRun)
+            .filter_by(portfolio_id=portfolio_id)
+            .order_by(SimulationRun.run_ts.desc(), SimulationRun.run_id.desc())
+            .first()
+        )
+        if run is None:
+            return None
+        by_type = {r.iar_type: r for r in run.results}
+
+        def _pair(t: str) -> dict | None:
+            r = by_type.get(t)
+            return {"iar": r.iar_value, "ciar": r.ciar_value} if r else None
+
+        any_result = next(iter(run.results), None)
+        return {
+            "portfolio_id": portfolio_id,
+            "run_id": run.run_id,
+            "run_ts": pd.to_datetime(run.run_ts, utc=True),
+            "vintage_ts": pd.to_datetime(run.vintage_ts, utc=True),
+            "horizon": any_result.horizon if any_result else None,
+            "confidence": any_result.confidence if any_result else None,
+            "n_scenarios": run.n_scenarios,
+            "gross": _pair("gross"),
+            "spread": _pair("spread"),
+        }
+
+
+def get_iar_curve(
+    portfolio_id: int,
+    iar_type: str = "gross",
+    *,
+    session: Session | None = None,
+) -> pd.DataFrame:
+    """IaR estimates over time for a portfolio + basis, one row per stored run.
+
+    Columns ``[horizon, vintage_ts, run_ts, confidence, iar_value, ciar_value]``,
+    ordered by ``vintage_ts`` — the time series the dashboard plots as the IaR
+    curve / limit-tracking view.
+    """
+    if iar_type not in ("gross", "spread"):
+        raise ValueError(f"iar_type must be 'gross' or 'spread', got {iar_type!r}")
+    with _scope(session) as s:
+        results = (
+            s.query(IaRResult)
+            .join(SimulationRun, IaRResult.run_id == SimulationRun.run_id)
+            .filter(
+                SimulationRun.portfolio_id == portfolio_id,
+                IaRResult.iar_type == iar_type,
+            )
+            .order_by(SimulationRun.vintage_ts, SimulationRun.run_id)
+            .all()
+        )
+        return pd.DataFrame(
+            [
+                {
+                    "horizon": r.horizon,
+                    "vintage_ts": pd.to_datetime(r.run.vintage_ts, utc=True),
+                    "run_ts": pd.to_datetime(r.run.run_ts, utc=True),
+                    "confidence": r.confidence,
+                    "iar_value": r.iar_value,
+                    "ciar_value": r.ciar_value,
+                }
+                for r in results
+            ],
+            columns=["horizon", "vintage_ts", "run_ts", "confidence", "iar_value", "ciar_value"],
+        )
+
+
+# --------------------------------------------------------------------------- #
+# Alerts (3.4) and backtest (3.1–3.3)
+# --------------------------------------------------------------------------- #
+def get_alerts(portfolio_id: int, *, session: Session | None = None) -> pd.DataFrame:
+    """Persisted limit-breach alerts for a portfolio (newest first)."""
+    with _scope(session) as s:
+        return load_alerts(s, portfolio_id)
+
+
+def get_backtest_summary(
+    portfolio_id: int,
+    iar_type: str = "gross",
+    *,
+    significance: float = 0.05,
+    session: Session | None = None,
+) -> dict:
+    """Exceedance + Kupiec calibration readout for a portfolio + basis.
+
+    Computed on read (does not persist). Returns the scalar summary plus a
+    ``"periods"`` DataFrame of per-period estimate-vs-realised outcomes::
+
+        {... summary fields ..., "periods": DataFrame[period, iar_estimate,
+                                                       realised_cost, exceeded]}
+    """
+    with _scope(session) as s:
+        result = run_backtest(s, portfolio_id, iar_type, significance=significance, persist=False)
+        summary = result.summary()
+        summary["periods"] = result.as_frame()
+        return summary
