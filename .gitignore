@@ -18,6 +18,7 @@ data/uploads/*
 # Local-only tooling config and scratch files
 .claude/settings.local.json
 test_apkey.py
+CLAUDE.md
 
 # Scratch (throwaway) — never committed
 scratch/
