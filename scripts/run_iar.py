@@ -210,9 +210,22 @@ def main() -> None:
                               "dam_source": dam_src},
             )
             s.commit()
+            # Evaluate the stored run against per-portfolio euro-limits (3.4) so the
+            # alerts table reflects the latest run. Best-effort: a missing/!invalid
+            # limits config must not fail the run.
+            try:
+                from iar.risk.alerts import evaluate_latest
+                alerts = evaluate_latest(s, pf.portfolio_id)
+                s.commit()
+                alert_note = (f"{len(alerts)} alert(s): "
+                              + ", ".join(f"{a.severity}" for a in alerts)) if alerts \
+                    else "no limit breaches"
+            except Exception as exc:  # noqa: BLE001
+                alert_note = f"alerts skipped ({type(exc).__name__})"
             print(bar)
             print(f"[stored] SimulationRun #{run.run_id} (portfolio #{pf.portfolio_id}) "
                   f"+ 2 IaRResult rows -> {DEFAULT_DB_PATH}")
+            print(f"[alerts] {alert_note}")
 
 
 if __name__ == "__main__":
