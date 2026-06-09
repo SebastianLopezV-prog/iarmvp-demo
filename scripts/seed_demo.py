@@ -41,11 +41,17 @@ def parse_args() -> argparse.Namespace:
 
 
 def reset_portfolios() -> int:
-    """Delete all users (cascades to portfolios + their series/runs/alerts)."""
+    """Delete all users via the ORM so cascades remove portfolios + their children.
+
+    (A bulk ``query(User).delete()`` bypasses ORM cascade and trips the FK
+    constraint; deleting mapped objects lets SQLAlchemy order the child deletes.)
+    """
     init_db()
     with get_session() as s:
-        n = s.query(User).count()
-        s.query(User).delete()
+        users = s.query(User).all()
+        n = len(users)
+        for u in users:
+            s.delete(u)
         s.commit()
     return n
 
