@@ -96,9 +96,19 @@ def _pick_vintage(by_vintage: dict, day_start: pd.Timestamp, day_end: pd.Timesta
     return max(candidates) if candidates else None
 
 
-def backfill_iar(
-    session: Session,
-    portfolio_id: int,
+@dataclass
+class PeriodEstimate:
+    """One day-ahead IaR estimate: the period, its chosen vintage, and the report."""
+
+    day_start: pd.Timestamp
+    day_end: pd.Timestamp
+    horizon: str          # delivery day, ISO date (e.g. "2026-06-09")
+    vintage: pd.Timestamp  # the day-ahead forecast event_time used
+    n_mtus: int
+    report: IaRReport
+
+
+def estimate_periods(
     *,
     forecast_records: list[dict],
     dam_price_map: dict,
@@ -106,42 +116,14 @@ def backfill_iar(
     capacity_mwh: float = DEFAULT_CAPACITY_MWH,
     model_config: ImbalanceModelConfig | None = None,
     engine_config: EngineConfig | None = None,
-    replace: bool = True,
-) -> list[SimulationRun]:
-    """Backfill day-ahead IaR estimates over the window covered by the inputs.
+) -> list[PeriodEstimate]:
+    """Compute one day-ahead IaR estimate per delivery day — **pure, no DB**.
 
-    Parameters
-    ----------
-    session:
-        Active SQLAlchemy session (caller commits).
-    portfolio_id:
-        Portfolio to attach the runs to (must exist).
-    forecast_records:
-        Normalised imbalance-spread forecast records spanning multiple vintages
-        (e.g. from ``OptimeeringForecastClient.get_historical_prices``). Each dict
-        has ``vintage_ts``, ``timestamp``, ``quantile``, ``value``.
-    dam_price_map:
-        ``{timestamp -> dam_price}`` (EUR/MWh). Timestamps may be tz-aware or ISO
-        strings; normalised to UTC internally.
-    position_map:
-        ``{timestamp -> (dam_position_mwh, forecast_generation_mwh)}``.
-    capacity_mwh:
-        Per-MTU installed-capacity energy used as the imbalance sigma basis.
-    model_config, engine_config:
-        Imbalance-model and engine settings; sensible defaults if omitted. The
-        engine seed must be set (it is, by default) so runs are reproducible.
-    replace:
-        If True (default), delete any existing run for the same (portfolio, day)
-        before writing — makes backfill idempotent.
-
-    Returns
-    -------
-    list[SimulationRun]
-        One persisted run per delivery day that had a usable day-ahead vintage.
+    Groups the forecast records by vintage, picks each day's day-ahead vintage,
+    builds the engine inputs over that day's MTUs, and runs the Monte Carlo.
+    Shared by :func:`backfill_iar` (which persists the reports) and the sigma
+    calibration loop (which only reads the IaR values), so both stay consistent.
     """
-    if session.get(Portfolio, portfolio_id) is None:
-        raise ValueError(f"Portfolio id {portfolio_id} does not exist.")
-
     model_config = model_config or ImbalanceModelConfig()
     engine_config = engine_config or EngineConfig()
 
@@ -153,10 +135,7 @@ def backfill_iar(
     }
 
     by_vintage = _group_by_vintage(forecast_records)
-    if not by_vintage:
-        return []
-
-    runs: list[SimulationRun] = []
+    estimates: list[PeriodEstimate] = []
     for day_start in _delivery_days(by_vintage):
         day_end = day_start + timedelta(days=1)
         vintage = _pick_vintage(by_vintage, day_start, day_end)
@@ -187,33 +166,103 @@ def backfill_iar(
             dam_pos, gen, capacity_mwh=capacity_mwh, config=model_config
         )
         report = run_simulation(price, imb, dam_price, engine_config)
+        estimates.append(
+            PeriodEstimate(
+                day_start=day_start,
+                day_end=day_end,
+                horizon=day_start.date().isoformat(),
+                vintage=vintage,
+                n_mtus=len(kept),
+                report=report,
+            )
+        )
+    return estimates
 
-        horizon = day_start.date().isoformat()
+
+def backfill_iar(
+    session: Session,
+    portfolio_id: int,
+    *,
+    forecast_records: list[dict],
+    dam_price_map: dict,
+    position_map: dict,
+    capacity_mwh: float = DEFAULT_CAPACITY_MWH,
+    model_config: ImbalanceModelConfig | None = None,
+    engine_config: EngineConfig | None = None,
+    replace: bool = True,
+) -> list[SimulationRun]:
+    """Backfill day-ahead IaR estimates over the window covered by the inputs.
+
+    Thin DB wrapper over :func:`estimate_periods`: persists each period's report
+    as a ``SimulationRun`` (stamped with the day-ahead ``vintage_ts``) plus its
+    ``gross``/``spread`` ``IaRResult`` rows.
+
+    Parameters
+    ----------
+    session:
+        Active SQLAlchemy session (caller commits).
+    portfolio_id:
+        Portfolio to attach the runs to (must exist).
+    forecast_records:
+        Normalised imbalance-spread forecast records spanning multiple vintages
+        (e.g. from ``OptimeeringForecastClient.get_historical_prices``). Each dict
+        has ``vintage_ts``, ``timestamp``, ``quantile``, ``value``.
+    dam_price_map:
+        ``{timestamp -> dam_price}`` (EUR/MWh); tz-aware or ISO, normalised to UTC.
+    position_map:
+        ``{timestamp -> (dam_position_mwh, forecast_generation_mwh)}``.
+    capacity_mwh:
+        Per-MTU installed-capacity energy used as the imbalance sigma basis.
+    model_config, engine_config:
+        Imbalance-model and engine settings; sensible defaults if omitted.
+    replace:
+        If True (default), delete any existing run for the same (portfolio, day)
+        before writing — makes backfill idempotent.
+
+    Returns
+    -------
+    list[SimulationRun]
+        One persisted run per delivery day that had a usable day-ahead vintage.
+    """
+    if session.get(Portfolio, portfolio_id) is None:
+        raise ValueError(f"Portfolio id {portfolio_id} does not exist.")
+
+    estimates = estimate_periods(
+        forecast_records=forecast_records,
+        dam_price_map=dam_price_map,
+        position_map=position_map,
+        capacity_mwh=capacity_mwh,
+        model_config=model_config,
+        engine_config=engine_config,
+    )
+
+    runs: list[SimulationRun] = []
+    for est in estimates:
         if replace:
             existing = (
                 session.query(SimulationRun)
                 .filter(
                     SimulationRun.portfolio_id == portfolio_id,
-                    SimulationRun.vintage_ts == vintage.to_pydatetime(),
+                    SimulationRun.vintage_ts == est.vintage.to_pydatetime(),
                 )
                 .all()
             )
             for run in existing:
-                if run.results and run.results[0].horizon == horizon:
+                if run.results and run.results[0].horizon == est.horizon:
                     session.delete(run)
             session.flush()
 
         run = persist_report(
             session,
-            report,
+            est.report,
             portfolio_id,
-            vintage_ts=vintage.to_pydatetime(),
-            horizon=horizon,
+            vintage_ts=est.vintage.to_pydatetime(),
+            horizon=est.horizon,
             extra_config={
                 "replay": True,
-                "period_start": day_start.isoformat(),
-                "period_end": day_end.isoformat(),
-                "n_mtus": len(kept),
+                "period_start": est.day_start.isoformat(),
+                "period_end": est.day_end.isoformat(),
+                "n_mtus": est.n_mtus,
             },
         )
         runs.append(run)
