@@ -418,34 +418,43 @@ with tab_bt:
                            legend=dict(orientation="h", y=-0.25))
         st.plotly_chart(rfig, use_container_width=True)
 
-    # ---- join: estimate vs realised (preview of 3.3) --------------------- #
-    st.markdown("### Vintage join — estimate vs realised (preview of 3.3)")
-    jf = join_frame(pid)
-    if jf.empty or jf["realised_gross"].isna().all():
-        st.info("Populate demo data to see each day's realised cost beside its day-ahead estimate.")
+    # ---- 3.3 calibration: exceedances + Kupiec POF ----------------------- #
+    st.markdown("### 3.3 — Calibration: exceedances + Kupiec POF")
+    bt_basis = st.radio("IaR basis", ["gross", "spread"], horizontal=True, key="bt_basis")
+    with get_session() as s:
+        res = run_backtest(s, pid, bt_basis, persist=True)
+        s.commit()
+
+    if res.n_periods == 0:
+        st.info("No settled periods yet — populate demo data (settled days need realised cost).")
     else:
-        def _exc(v):
-            if v is True:
-                return "🔴 exceeded"
-            if v is False:
-                return "🟢 within"
-            return "—"
-        show = jf.copy()
-        show["gross_exceeded"] = show["gross_exceeded"].map(_exc)
+        k = res.kupiec
+        verdict = ("🟢 calibrated" if k.well_calibrated else "🔴 mis-calibrated") \
+            if k.well_calibrated is not None else "—"
+        kc = st.columns(4)
+        kc[0].metric("Exceedances", f"{res.n_exceedances} / {res.n_periods}")
+        kc[1].metric("Observed rate", f"{k.observed_rate:.0%}",
+                     help=f"Expected ≈ {k.expected_rate:.0%} at this confidence")
+        kc[2].metric("Kupiec LR", f"{k.lr_statistic:.2f}" if k.lr_statistic is not None else "—",
+                     help="χ²(1) likelihood-ratio statistic")
+        kc[3].metric("Kupiec verdict", verdict,
+                     help=f"p-value {k.p_value:.3f}" if k.p_value is not None else "")
+
+        df = res.as_frame()
+        df["exceeded"] = df["exceeded"].map(lambda v: "🔴 exceeded" if v else "🟢 within")
         st.dataframe(
-            show.style.format({
-                "est_gross_IaR": "{:,.0f}", "realised_gross": "{:,.0f}",
-                "est_spread_IaR": "{:,.0f}", "realised_spread": "{:,.0f}",
-            }, na_rep="—"),
+            df.rename(columns={"iar_estimate": f"{bt_basis}_IaR_estimate",
+                               "realised_cost": f"realised_{bt_basis}_cost"})
+              .style.format({f"{bt_basis}_IaR_estimate": "{:,.0f}",
+                             f"realised_{bt_basis}_cost": "{:,.0f}"}),
             use_container_width=True, hide_index=True,
         )
-        n_days = int(jf["realised_gross"].notna().sum())
-        n_exc = int((jf["gross_exceeded"] == True).sum())  # noqa: E712
         st.caption(
-            f"Gross exceedances: **{n_exc} / {n_days}** day(s). At P{confidence:.0%} a "
-            "well-calibrated model exceeds ~"
-            f"{(1 - confidence) * 100:.0f}% of the time — **3.3** turns this into the "
-            "formal exceedance-frequency + Kupiec POF test."
+            f"Each settled day's realised {bt_basis} cost vs the day-ahead IaR estimate that "
+            "preceded it (3.2 join). An **exceedance** is realised cost worse than the estimate. "
+            "Rows are persisted as `HistoricalPerformanceRecord`. With only a few settled days the "
+            "Kupiec test has low power — it's a calibration *readout*, not a verdict, until more "
+            "history accrues."
         )
 
     # ---- the join function itself ---------------------------------------- #
