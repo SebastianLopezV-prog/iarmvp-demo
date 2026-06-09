@@ -326,7 +326,9 @@ with tab_live:
     s1.markdown(f"**Spread**  \n{tag(True)} (Optimeering)")
     s2.markdown(f"**DAM spot**  \n{tag(dam_real)}" + ("" if dam_real else "  \n_wheel missing_"))
     s3.markdown(f"**Portfolio**  \n{tag(pos_real)}" + (f"  \n_{pf_name}_" if pos_real else "  \n_synthetic_"))
-    s4.markdown(f"**Sigma**  \n🟡 stub ({sigma:.0%})")
+    _sig_tag = ("🟢 calibrated" if st.session_state.get("sigma_calibrated")
+                else "🟡 manual stub")
+    s4.markdown(f"**Sigma**  \n{_sig_tag} ({sigma:.0%})")
 
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Gross IaR", f"{-rep.gross.iar:,.0f} EUR", help="Worst-case P&L (negative = loss)")
