@@ -1,19 +1,22 @@
 """THROWAWAY demo UI — IaR MVP Risk Dashboard (gitignored, delete anytime).
 
-Now runs on REAL inputs (matching scripts/run_iar.py):
-  * live Optimeering spread quantiles      -> QuantilePriceSampler (2.2)
-  * REAL DAM cleared (spot) price           -> internal MarketsApi (markets_client)
-  * REAL portfolio positions/generation     -> loaded from iar.db (windsim via client CSVs)
-  * independent Monte Carlo                 -> run_simulation (2.3)
-
-Simulates over the MTUs where all available real sources overlap. Only the imbalance
-`sigma` is still a parametric knob (Week-3 calibration). Reuses the real backend modules.
+Two tabs:
+  * **Live IaR** — a real Monte Carlo run (matching scripts/run_iar.py):
+      live Optimeering spread (2.2) + real DAM spot (markets_client) + real
+      windsim positions (from iar.db) -> run_simulation (2.3).
+  * **Backtest (3.1 + 3.2)** — surfaces the new Week-3 backend:
+      realised imbalance cost (3.1, iar.risk.realised_cost), backfilled day-ahead
+      IaR estimates (3.2, iar.risk.replay), and the vintage comparison join
+      (iar.risk.backtest.estimate_for_period). A one-click "populate demo data"
+      button fills the realised-price + estimate history the panels read, because
+      the real realised-price feed needs the vendored optipyclient wheel.
 
 Run:  .\\venv\\Scripts\\python.exe -m streamlit run "beginner UI\\dashboard.py"
 """
 
 from __future__ import annotations
 
+import json
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -25,10 +28,23 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from iar.db.models import DAMPosition, GenerationForecast, Portfolio
+from iar.db.models import (
+    ActualDelivery,
+    DAMPosition,
+    GenerationForecast,
+    Portfolio,
+    SimulationRun,
+)
 from iar.db.session import get_session, init_db
+from iar.ingestion.flatfile_loader import (
+    store_actual_imbalance_price_records,
+    store_dam_price_records,
+)
 from iar.ingestion.markets_client import OptimeeringMarketsClient
 from iar.ingestion.optimeering_client import OptimeeringForecastClient
+from iar.risk.backtest import estimate_for_period, iar_estimate_for_period
+from iar.risk.realised_cost import compute_realised_cost, realised_period_cost
+from iar.risk.replay import backfill_iar
 from iar.simulation.engine import EngineConfig, run_simulation
 from iar.simulation.imbalance_model import ImbalanceModel, ImbalanceModelConfig
 from iar.simulation.price_sampler import QuantilePriceSampler
@@ -79,6 +95,139 @@ def fetch_positions(area: str):
 
 
 # --------------------------------------------------------------------------- #
+# Backtest helpers (3.1 + 3.2) — read the real backend modules off the DB
+# --------------------------------------------------------------------------- #
+def portfolio_id_for(area: str):
+    init_db()
+    with get_session() as s:
+        pf = (s.query(Portfolio).filter_by(price_area=area)
+              .order_by(Portfolio.portfolio_id.desc()).first())
+        return (pf.portfolio_id, pf.name) if pf else (None, None)
+
+
+def load_estimates(pid: int) -> pd.DataFrame:
+    """Backfilled day-ahead IaR estimates (3.2) for a portfolio, oldest first."""
+    with get_session() as s:
+        runs = (s.query(SimulationRun).filter_by(portfolio_id=pid)
+                .order_by(SimulationRun.vintage_ts).all())
+        rows = []
+        for run in runs:
+            res = {r.iar_type: r for r in run.results}
+            cfg = json.loads(run.config_json or "{}")
+            day = res["gross"].horizon if "gross" in res else ""
+            rows.append({
+                "delivery_day": day,
+                "vintage_ts": pd.to_datetime(run.vintage_ts, utc=True),
+                "gross_IaR": res["gross"].iar_value if "gross" in res else None,
+                "spread_IaR": res["spread"].iar_value if "spread" in res else None,
+                "gross_CIaR": res["gross"].ciar_value if "gross" in res else None,
+                "n_mtus": cfg.get("n_mtus"),
+                "source": "replay" if cfg.get("replay") else "live --store",
+            })
+        return pd.DataFrame(rows)
+
+
+def realised_frame(pid: int) -> pd.DataFrame:
+    with get_session() as s:
+        return compute_realised_cost(s, pid)
+
+
+def join_frame(pid: int) -> pd.DataFrame:
+    """Per delivery day: backfilled estimate (3.2) vs realised cost (3.1)."""
+    with get_session() as s:
+        runs = (s.query(SimulationRun).filter_by(portfolio_id=pid)
+                .order_by(SimulationRun.vintage_ts).all())
+        rows = []
+        for run in runs:
+            cfg = json.loads(run.config_json or "{}")
+            res = {r.iar_type: r for r in run.results}
+            ps, pe = cfg.get("period_start"), cfg.get("period_end")
+            est_g = res["gross"].iar_value if "gross" in res else None
+            est_s = res["spread"].iar_value if "spread" in res else None
+            realised = realised_period_cost(s, pid, start=ps, end=pe) if ps and pe else None
+            have = bool(realised and realised["n_mtus"])
+            rg = realised["gross"] if have else None
+            rs = realised["spread"] if have else None
+            rows.append({
+                "delivery_day": res["gross"].horizon if "gross" in res else "",
+                "est_gross_IaR": est_g,
+                "realised_gross": rg,
+                "gross_exceeded": (rg > est_g) if (have and est_g is not None) else None,
+                "est_spread_IaR": est_s,
+                "realised_spread": rs,
+                "n_mtus_realised": realised["n_mtus"] if realised else 0,
+            })
+        return pd.DataFrame(rows)
+
+
+def populate_demo_backtest(area, pid, pct, curve, dam_map_iso, fallback, cfg):
+    """Fill the DB with the inputs the backtest panels need (clearly DEMO).
+
+    REAL: positions/generation/actual delivery (windsim) + DAM spot (where the
+    wheel served it). DEMO: the realised imbalance *price* (synthesised as
+    DAM + a spread sampled from the live quantile curve) and per-day forecast
+    vintages (the live curve replayed as each day's day-ahead estimate). Lets
+    3.1/3.2 run end-to-end without the vendored realised-price feed.
+    """
+    with get_session() as s:
+        dampos = {pd.to_datetime(r.timestamp, utc=True): r.mwh
+                  for r in s.query(DAMPosition).filter_by(portfolio_id=pid)}
+        gen = {pd.to_datetime(r.timestamp, utc=True): r.forecast_mwh
+               for r in s.query(GenerationForecast).filter_by(portfolio_id=pid)}
+        act = {pd.to_datetime(r.timestamp, utc=True): r.actual_mwh
+               for r in s.query(ActualDelivery).filter_by(portfolio_id=pid)}
+    mtus = sorted(set(dampos) & set(gen) & set(act))
+    if not mtus:
+        return {"mtus": 0, "runs": 0}
+
+    dam = {t: float(dam_map_iso.get(t.isoformat(), fallback)) for t in mtus}
+
+    # DEMO realised imbalance price = DAM + a spread drawn from the live curve.
+    sampler = QuantilePriceSampler.from_percentiles(
+        np.array(pct, dtype=float), np.tile(np.asarray(curve, dtype=float), (len(mtus), 1))
+    )
+    rng = np.random.default_rng(cfg["seed"])
+    realised_spread = sampler.ppf(rng.random((1, len(mtus))))[0]
+    realised_price = np.array([dam[t] for t in mtus]) + realised_spread
+
+    # DEMO forecast vintages: the live curve as each day's day-ahead forecast.
+    pct_list = list(pct)
+    forecast_records = []
+    for t in mtus:
+        vintage = (t.normalize() - pd.Timedelta(hours=12)).isoformat()
+        for q in pct_list:
+            forecast_records.append({
+                "vintage_ts": vintage, "timestamp": t.isoformat(),
+                "quantile": q, "value": float(curve[pct_list.index(q)]),
+            })
+
+    with get_session() as s:
+        store_dam_price_records(
+            s, area, [{"timestamp": t.isoformat(), "eur_per_mwh": dam[t]} for t in mtus]
+        )
+        store_actual_imbalance_price_records(
+            s, area,
+            [{"timestamp": t.isoformat(), "eur_per_mwh": float(p)}
+             for t, p in zip(mtus, realised_price)],
+        )
+        runs = backfill_iar(
+            s, pid,
+            forecast_records=forecast_records,
+            dam_price_map={t: dam[t] for t in mtus},
+            position_map={t: (dampos[t], gen[t]) for t in mtus},
+            capacity_mwh=cfg["capacity"] * MTU_HOURS,
+            model_config=ImbalanceModelConfig(
+                dist=cfg["dist"], sigma_fraction=cfg["sigma"], scale_basis="capacity"
+            ),
+            engine_config=EngineConfig(
+                n_scenarios=int(cfg["scenarios"]), confidence=cfg["confidence"], seed=cfg["seed"]
+            ),
+        )
+        s.commit()
+        return {"mtus": len(mtus), "runs": len(runs)}
+
+
+# --------------------------------------------------------------------------- #
 # Sidebar
 # --------------------------------------------------------------------------- #
 st.sidebar.title("Controls")
@@ -95,6 +244,8 @@ if st.sidebar.button("↻ Refresh live data"):
     fetch_spread.clear()
     fetch_dam.clear()
 
+# --------------------------------------------------------------------------- #
+# Shared data + live run
 # --------------------------------------------------------------------------- #
 st.title("IaR MVP — Risk Dashboard")
 
@@ -139,65 +290,209 @@ imb = ImbalanceModel.from_inputs(
 rep = run_simulation(price, imb, dam_price,
                      EngineConfig(n_scenarios=int(scenarios), confidence=confidence, seed=seed))
 
-# --- data-source status -------------------------------------------------- #
+curve = np.median(spread, axis=0)  # representative spread curve for the demo backtest
+
+
 def tag(real: bool) -> str:
     return "🟢 LIVE/REAL" if real else "🔴 STUB"
 
-st.caption(
-    f"area **{area}** · **{n}** MTUs (overlap) · {int(scenarios):,} scenarios · "
-    f"{confidence:.0%} confidence · vintage `{vintage}`"
-)
-s1, s2, s3, s4 = st.columns(4)
-s1.markdown(f"**Spread**  \n{tag(True)} (Optimeering)")
-s2.markdown(f"**DAM spot**  \n{tag(dam_real)}" + ("" if dam_real else "  \n_wheel missing_"))
-s3.markdown(f"**Portfolio**  \n{tag(pos_real)}" + (f"  \n_{pf_name}_" if pos_real else "  \n_synthetic_"))
-s4.markdown(f"**Sigma**  \n🟡 stub ({sigma:.0%})")
 
-# --- headline P&L metrics (negative = loss) ------------------------------- #
-c1, c2, c3, c4 = st.columns(4)
-c1.metric("Gross IaR", f"{-rep.gross.iar:,.0f} EUR", help="Worst-case P&L (negative = loss)")
-c2.metric("Gross CIaR", f"{-rep.gross.ciar:,.0f} EUR", help="Average P&L in the worst tail")
-c3.metric("Spread IaR", f"{-rep.spread.iar:,.0f} EUR")
-c4.metric("Spread CIaR", f"{-rep.spread.ciar:,.0f} EUR")
+tab_live, tab_bt = st.tabs(["📉 Live IaR", "🔁 Backtest (3.1 + 3.2)"])
 
-# --- charts --------------------------------------------------------------- #
-left, right = st.columns([3, 2])
-with left:
-    basis = st.radio("P&L basis", ["Gross", "Spread"], horizontal=True)
-    m = rep.gross if basis == "Gross" else rep.spread
-    pnl, pnl_mean, pnl_iar, pnl_ciar = -m.cost, -m.mean, -m.iar, -m.ciar
-    fig = go.Figure()
-    fig.add_histogram(x=pnl, nbinsx=60, marker_color="#4C78A8", name="scenarios")
-    fig.add_vline(x=pnl_mean, line_color="green", line_dash="dot",
-                  annotation_text=f"mean {pnl_mean:,.0f}", annotation_position="top right")
-    fig.add_vline(x=pnl_iar, line_color="orange",
-                  annotation_text=f"IaR {pnl_iar:,.0f}", annotation_position="top")
-    fig.add_vline(x=pnl_ciar, line_color="red",
-                  annotation_text=f"CIaR {pnl_ciar:,.0f}", annotation_position="top left")
-    fig.update_layout(title=f"{basis} P&L distribution ({int(scenarios):,} scenarios)",
-                      xaxis_title="EUR over horizon  (positive = gain, negative = loss)",
-                      yaxis_title="scenarios", bargap=0.02, height=400, margin=dict(t=50, b=40))
-    st.plotly_chart(fig, use_container_width=True)
+# =========================================================================== #
+# TAB 1 — Live IaR (existing functionality)
+# =========================================================================== #
+with tab_live:
+    st.caption(
+        f"area **{area}** · **{n}** MTUs (overlap) · {int(scenarios):,} scenarios · "
+        f"{confidence:.0%} confidence · vintage `{vintage}`"
+    )
+    s1, s2, s3, s4 = st.columns(4)
+    s1.markdown(f"**Spread**  \n{tag(True)} (Optimeering)")
+    s2.markdown(f"**DAM spot**  \n{tag(dam_real)}" + ("" if dam_real else "  \n_wheel missing_"))
+    s3.markdown(f"**Portfolio**  \n{tag(pos_real)}" + (f"  \n_{pf_name}_" if pos_real else "  \n_synthetic_"))
+    s4.markdown(f"**Sigma**  \n🟡 stub ({sigma:.0%})")
 
-with right:
-    idx = {p: i for i, p in enumerate(pct)}
-    x = pd.to_datetime([ft[i] for i in keep], utc=True)
-    p05, p50, p95 = spread[:, idx[5.0]], spread[:, idx[50.0]], spread[:, idx[95.0]]
-    fan = go.Figure()
-    fan.add_scatter(x=x, y=p95, line=dict(width=0), showlegend=False, hoverinfo="skip")
-    fan.add_scatter(x=x, y=p05, fill="tonexty", fillcolor="rgba(76,120,168,0.2)",
-                    line=dict(width=0), name="P05–P95")
-    fan.add_scatter(x=x, y=p50, line=dict(color="#4C78A8"), name="P50 (median)")
-    fan.update_layout(title="Live Optimeering imbalance SPREAD forecast",
-                      xaxis_title="time (UTC)", yaxis_title="EUR/MWh vs spot",
-                      height=400, margin=dict(t=50, b=40), legend=dict(orientation="h", y=-0.25))
-    st.plotly_chart(fan, use_container_width=True)
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Gross IaR", f"{-rep.gross.iar:,.0f} EUR", help="Worst-case P&L (negative = loss)")
+    c2.metric("Gross CIaR", f"{-rep.gross.ciar:,.0f} EUR", help="Average P&L in the worst tail")
+    c3.metric("Spread IaR", f"{-rep.spread.iar:,.0f} EUR")
+    c4.metric("Spread CIaR", f"{-rep.spread.ciar:,.0f} EUR")
 
-if dam_err:
-    st.warning(f"Real DAM price unavailable → using flat fallback. ({dam_err})")
-st.info(
-    "P&L view: **negative = loss, positive = gain**. Spread (Optimeering), DAM spot "
-    "(internal MarketsApi) and the portfolio (windsim, via the client CSV path) are all "
-    "REAL when available; the imbalance **sigma** is the only remaining parametric stub "
-    "(calibrated against realised actuals in Week 3)."
-)
+    left, right = st.columns([3, 2])
+    with left:
+        basis = st.radio("P&L basis", ["Gross", "Spread"], horizontal=True)
+        m = rep.gross if basis == "Gross" else rep.spread
+        pnl, pnl_mean, pnl_iar, pnl_ciar = -m.cost, -m.mean, -m.iar, -m.ciar
+        fig = go.Figure()
+        fig.add_histogram(x=pnl, nbinsx=60, marker_color="#4C78A8", name="scenarios")
+        fig.add_vline(x=pnl_mean, line_color="green", line_dash="dot",
+                      annotation_text=f"mean {pnl_mean:,.0f}", annotation_position="top right")
+        fig.add_vline(x=pnl_iar, line_color="orange",
+                      annotation_text=f"IaR {pnl_iar:,.0f}", annotation_position="top")
+        fig.add_vline(x=pnl_ciar, line_color="red",
+                      annotation_text=f"CIaR {pnl_ciar:,.0f}", annotation_position="top left")
+        fig.update_layout(title=f"{basis} P&L distribution ({int(scenarios):,} scenarios)",
+                          xaxis_title="EUR over horizon  (positive = gain, negative = loss)",
+                          yaxis_title="scenarios", bargap=0.02, height=400, margin=dict(t=50, b=40))
+        st.plotly_chart(fig, use_container_width=True)
+
+    with right:
+        idx = {p: i for i, p in enumerate(pct)}
+        x = pd.to_datetime([ft[i] for i in keep], utc=True)
+        p05, p50, p95 = spread[:, idx[5.0]], spread[:, idx[50.0]], spread[:, idx[95.0]]
+        fan = go.Figure()
+        fan.add_scatter(x=x, y=p95, line=dict(width=0), showlegend=False, hoverinfo="skip")
+        fan.add_scatter(x=x, y=p05, fill="tonexty", fillcolor="rgba(76,120,168,0.2)",
+                        line=dict(width=0), name="P05–P95")
+        fan.add_scatter(x=x, y=p50, line=dict(color="#4C78A8"), name="P50 (median)")
+        fan.update_layout(title="Live Optimeering imbalance SPREAD forecast",
+                          xaxis_title="time (UTC)", yaxis_title="EUR/MWh vs spot",
+                          height=400, margin=dict(t=50, b=40), legend=dict(orientation="h", y=-0.25))
+        st.plotly_chart(fan, use_container_width=True)
+
+    if dam_err:
+        st.warning(f"Real DAM price unavailable → using flat fallback. ({dam_err})")
+    st.info(
+        "P&L view: **negative = loss, positive = gain**. Spread (Optimeering), DAM spot "
+        "(internal MarketsApi) and the portfolio (windsim, via the client CSV path) are all "
+        "REAL when available; the imbalance **sigma** is the only remaining parametric stub "
+        "(calibrated against realised actuals in Week 3)."
+    )
+
+# =========================================================================== #
+# TAB 2 — Backtest (3.1 realised cost + 3.2 vintage replay & join)
+# =========================================================================== #
+with tab_bt:
+    st.subheader("Week-3 backtest building blocks")
+    st.caption(
+        "**3.1** realised imbalance cost (`iar.risk.realised_cost`) · "
+        "**3.2** backfilled day-ahead estimates + vintage join "
+        "(`iar.risk.replay`, `iar.risk.backtest`). Calibration (Kupiec/exceedance %) is **3.3**."
+    )
+
+    pid, bt_pf_name = portfolio_id_for(area)
+    if pid is None:
+        st.warning(
+            f"No portfolio loaded for **{area}**. Run "
+            "`scripts/load_windsim_data.py` first to ingest positions/actuals."
+        )
+        st.stop()
+
+    estimates = load_estimates(pid)
+    realised = realised_frame(pid)
+    has_data = not estimates.empty or not realised.empty
+
+    cfg = {"scenarios": scenarios, "confidence": confidence, "sigma": sigma,
+           "capacity": capacity, "dist": dist, "seed": seed}
+
+    top = st.columns([3, 2])
+    with top[0]:
+        st.markdown(f"Portfolio **{bt_pf_name}** (#{pid}) · area **{area}**")
+        st.caption(
+            "Realised price + forecast vintages here are **DEMO** (the live realised-price "
+            "feed needs the vendored optipyclient wheel). Positions, generation, actual "
+            "delivery and DAM spot are REAL where available."
+        )
+    with top[1]:
+        if st.button("⚙️ Populate / refresh demo backtest data", type="primary"):
+            with st.spinner("Storing realised prices + backfilling day-ahead estimates…"):
+                out = populate_demo_backtest(area, pid, pct, curve, dam_map, dam_fallback, cfg)
+            if out["mtus"] == 0:
+                st.error("No MTUs with positions + generation + actual delivery in the DB.")
+            else:
+                st.success(f"Stored {out['mtus']} realised prices · backfilled {out['runs']} day(s).")
+                st.rerun()
+
+    if not has_data:
+        st.info("No backtest data yet — click **Populate / refresh demo backtest data** above.")
+        st.stop()
+
+    # ---- 3.2 backfilled estimates ---------------------------------------- #
+    st.markdown("### 3.2 — Backfilled day-ahead IaR estimates")
+    if estimates.empty:
+        st.info("No stored estimates yet.")
+    else:
+        st.dataframe(
+            estimates.style.format({
+                "gross_IaR": "{:,.0f}", "spread_IaR": "{:,.0f}", "gross_CIaR": "{:,.0f}",
+            }),
+            use_container_width=True, hide_index=True,
+        )
+        st.caption("Each row is the estimate stamped with the vintage that *preceded* its "
+                   "delivery day (no look-ahead) — the history the backtest joins against.")
+
+    # ---- 3.1 realised cost ----------------------------------------------- #
+    st.markdown("### 3.1 — Realised imbalance cost")
+    if realised.empty:
+        st.info("No realised cost yet (needs actual delivery + actual imbalance price + DAM price).")
+    else:
+        period = realised_period_cost.__wrapped__ if hasattr(realised_period_cost, "__wrapped__") else None
+        tot_gross = float(realised["gross_cost"].sum())
+        tot_spread = float(realised["spread_cost"].sum())
+        rc1, rc2, rc3 = st.columns(3)
+        rc1.metric("Realised Gross cost", f"{tot_gross:,.0f} EUR",
+                   help="Σ imbalance × imbalance price (positive = cost)")
+        rc2.metric("Realised Spread cost", f"{tot_spread:,.0f} EUR")
+        rc3.metric("Settled MTUs", f"{len(realised):,}")
+
+        rfig = go.Figure()
+        rfig.add_bar(x=realised["timestamp"], y=realised["gross_cost"], name="gross cost",
+                     marker_color="#E45756")
+        rfig.add_bar(x=realised["timestamp"], y=realised["spread_cost"], name="spread cost",
+                     marker_color="#F58518")
+        rfig.update_layout(title="Realised settlement cost per MTU (positive = cost)",
+                           barmode="overlay", xaxis_title="time (UTC)", yaxis_title="EUR",
+                           height=320, margin=dict(t=50, b=40),
+                           legend=dict(orientation="h", y=-0.25))
+        st.plotly_chart(rfig, use_container_width=True)
+
+    # ---- join: estimate vs realised (preview of 3.3) --------------------- #
+    st.markdown("### Vintage join — estimate vs realised (preview of 3.3)")
+    jf = join_frame(pid)
+    if jf.empty or jf["realised_gross"].isna().all():
+        st.info("Populate demo data to see each day's realised cost beside its day-ahead estimate.")
+    else:
+        def _exc(v):
+            if v is True:
+                return "🔴 exceeded"
+            if v is False:
+                return "🟢 within"
+            return "—"
+        show = jf.copy()
+        show["gross_exceeded"] = show["gross_exceeded"].map(_exc)
+        st.dataframe(
+            show.style.format({
+                "est_gross_IaR": "{:,.0f}", "realised_gross": "{:,.0f}",
+                "est_spread_IaR": "{:,.0f}", "realised_spread": "{:,.0f}",
+            }, na_rep="—"),
+            use_container_width=True, hide_index=True,
+        )
+        n_days = int(jf["realised_gross"].notna().sum())
+        n_exc = int((jf["gross_exceeded"] == True).sum())  # noqa: E712
+        st.caption(
+            f"Gross exceedances: **{n_exc} / {n_days}** day(s). At P{confidence:.0%} a "
+            "well-calibrated model exceeds ~"
+            f"{(1 - confidence) * 100:.0f}% of the time — **3.3** turns this into the "
+            "formal exceedance-frequency + Kupiec POF test."
+        )
+
+    # ---- the join function itself ---------------------------------------- #
+    with st.expander("🔎 Vintage lookup — `backtest.estimate_for_period`"):
+        st.caption("Pick a moment; see which stored estimate the backtest would use for it "
+                   "(the latest vintage at or before that instant).")
+        d = st.date_input("As-of date (period start, UTC)")
+        if d is not None:
+            ps = pd.Timestamp(d, tz="UTC")
+            with get_session() as s:
+                run = estimate_for_period(s, pid, ps)
+                if run is None:
+                    st.write("No estimate precedes that instant.")
+                else:
+                    g = iar_estimate_for_period(s, pid, ps, "gross")
+                    sp = iar_estimate_for_period(s, pid, ps, "spread")
+                    st.write(
+                        f"→ estimate for delivery day **{run.results[0].horizon}**, "
+                        f"vintage `{pd.to_datetime(run.vintage_ts, utc=True).isoformat()}` · "
+                        f"Gross IaR **{g.iar_value:,.0f}** · Spread IaR **{sp.iar_value:,.0f}** EUR"
+                    )
