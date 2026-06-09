@@ -524,6 +524,57 @@ with tab_bt:
             "history accrues."
         )
 
+    # ---- sigma calibration: close the loop (Option 1) -------------------- #
+    st.markdown("### 🎯 Calibrate sigma — close the backtest loop")
+    st.caption(
+        "Sweep the imbalance **sigma** and pick the value whose realised exceedance "
+        "rate is closest to the target (~1 − confidence). Turns the last hand-set knob "
+        "into a data-informed choice."
+    )
+    if st.button("Run sigma calibration", key="calib_btn"):
+        with st.spinner("Sweeping sigma against the backtest…"):
+            st.session_state["calib"] = calibrate_demo(
+                pid, pct, curve, dam_map, dam_fallback, cfg, bt_basis
+            )
+    cal = st.session_state.get("calib")
+    if cal is not None:
+        if cal.recommended_sigma_fraction is None:
+            st.info(cal.note)
+        else:
+            cc = st.columns([1, 2])
+            cc[0].metric("Recommended sigma", f"{cal.recommended_sigma_fraction:.0%}",
+                         help=f"basis={cal.iar_type}")
+            cc[1].caption(
+                f"Achieved exceedance **{cal.achieved_rate:.0%}** vs target "
+                f"**{cal.target_rate:.0%}** over {cal.n_periods} settled day(s). {cal.note}"
+            )
+            gdf = pd.DataFrame(
+                [(s, r) for s, r in cal.grid if r is not None],
+                columns=["sigma_fraction", "exceedance_rate"],
+            )
+            if not gdf.empty:
+                gfig = go.Figure()
+                gfig.add_scatter(x=gdf["sigma_fraction"], y=gdf["exceedance_rate"],
+                                 mode="lines+markers", name="exceedance rate")
+                gfig.add_hline(y=cal.target_rate, line_color="green", line_dash="dot",
+                               annotation_text=f"target {cal.target_rate:.0%}")
+                gfig.add_vline(x=cal.recommended_sigma_fraction, line_color="orange",
+                               annotation_text="recommended")
+                gfig.update_layout(title="Exceedance rate vs sigma (lower sigma → more breaches)",
+                                   xaxis_title="sigma (fraction of capacity)",
+                                   yaxis_title="exceedance rate", height=300,
+                                   margin=dict(t=50, b=40))
+                st.plotly_chart(gfig, use_container_width=True)
+
+            _rec = float(min(max(cal.recommended_sigma_fraction, 0.02), 0.40))
+
+            def _apply_sigma(v=_rec):
+                st.session_state["sigma_pct"] = v
+                st.session_state["sigma_calibrated"] = True
+
+            st.button("✅ Apply recommended sigma to the live run", on_click=_apply_sigma,
+                      help="Sets the sidebar sigma slider; the Live IaR tab tags it 🟢 calibrated.")
+
     # ---- the join function itself ---------------------------------------- #
     with st.expander("🔎 Vintage lookup — `backtest.estimate_for_period`"):
         st.caption("Pick a moment; see which stored estimate the backtest would use for it "
