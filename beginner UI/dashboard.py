@@ -245,8 +245,12 @@ st.sidebar.title("Controls")
 area = st.sidebar.selectbox("Price area", ["NO2", "NO1", "SE3"], index=0)
 scenarios = st.sidebar.select_slider("Scenarios", [2_000, 5_000, 10_000, 25_000, 50_000], value=10_000)
 confidence = st.sidebar.slider("Confidence", 0.80, 0.99, 0.95, 0.01)
-sigma = st.sidebar.slider("Imbalance sigma (% of capacity)", 0.02, 0.30, 0.10, 0.01,
-                          help="The ONLY remaining stub — forecast-error size; calibrated in Week 3.")
+if "sigma_pct" not in st.session_state:
+    st.session_state["sigma_pct"] = 0.10
+sigma = st.sidebar.slider(
+    "Imbalance sigma (% of capacity)", 0.02, 0.40, step=0.01, key="sigma_pct",
+    help="Forecast-error size. Hand-set by default; the backtest tab can calibrate it.",
+)
 capacity = st.sidebar.number_input("Capacity (MW) — sigma basis", 1.0, 1000.0, 19.0, 1.0)
 dist = st.sidebar.selectbox("Imbalance distribution", ["normal", "student_t"], index=0)
 seed = int(st.sidebar.number_input("Seed", 0, 9999, 42, 1))
