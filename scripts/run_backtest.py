@@ -97,8 +97,14 @@ def main() -> None:
             # When testing both bases, only the first persists (the record schema
             # has no iar_type column, so a second persist would overwrite the first).
             do_persist = persist and (i == 0)
+            if do_persist:
+                note = "persisted"
+            elif not persist:
+                note = "NOT persisted (--no-persist)"
+            else:
+                note = "NOT persisted (only the first basis persists with --basis both)"
             res = run_backtest(s, pid, basis, significance=args.significance, persist=do_persist)
-            _print_result(res, persisted=do_persist)
+            _print_result(res, persist_note=note)
         s.commit()
 
     print("=" * 64)
