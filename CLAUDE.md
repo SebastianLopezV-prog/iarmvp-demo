@@ -233,5 +233,13 @@ price'`) and many other series — useful for the Week-3 backtest (realised actu
 period's realised cost to the IaR estimate whose `vintage_ts` precedes it; Kupiec POF test
 (~5% exceedances at P95); recalibrate the imbalance-model `sigma` against realised outcomes.
 
-**Repo:** private GitHub `SebastianLopezV-prog/iarmvp`. A local PostToolUse hook
-auto-commits after every Edit/Write (`.claude/settings.local.json`); pushes are manual.
+**Repo:** primary is private GitHub **`Volue/iarmvp`** (origin); `SebastianLopezV-prog/iarmvp`
+kept as the `personal` remote (backup). Full history moved over. The Volue org enforces SAML
+SSO — authorise the git credential once. A local PostToolUse hook auto-commits after every
+Edit/Write (`.claude/settings.local.json`); pushes are manual.
+
+**Not in the repo (gitignored, must be added per README → "What you need to add"):** `.env`
+(`OPTIMEERING_API_KEY`), the `optipyclient` wheel in `vendor/` (real DAM spot, from
+Volue/sirius-prime releases), `windsim` (real positions, pip-install from
+Volue/sirius-imb-at-risk-mvp), `data/` runtime files, and **this `CLAUDE.md` itself**
+(local-only working doc, intentionally untracked).
