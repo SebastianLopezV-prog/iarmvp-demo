@@ -201,6 +201,43 @@ def populate_demo_backtest(area, pid, pct, curve, dam_map_iso, fallback, cfg):
         return {"mtus": len(mtus), "runs": len(runs)}
 
 
+def calibrate_demo(pid, pct, curve, dam_map_iso, fallback, cfg, basis):
+    """Sweep sigma against the backtest and recommend the best-calibrated value.
+
+    Reuses the same DEMO forecast curve as the populator; realised cost is read
+    from whatever is already in the DB (populate it first). Returns a
+    ``CalibrationResult`` (or ``None`` if there are no positions to estimate).
+    """
+    with get_session() as s:
+        dampos = {pd.to_datetime(r.timestamp, utc=True): r.mwh
+                  for r in s.query(DAMPosition).filter_by(portfolio_id=pid)}
+        gen = {pd.to_datetime(r.timestamp, utc=True): r.forecast_mwh
+               for r in s.query(GenerationForecast).filter_by(portfolio_id=pid)}
+    mtus = sorted(set(dampos) & set(gen))
+    if not mtus:
+        return None
+
+    dam = {t: float(dam_map_iso.get(t.isoformat(), fallback)) for t in mtus}
+    pct_list = list(pct)
+    forecast_records = [
+        {"vintage_ts": (t.normalize() - pd.Timedelta(hours=12)).isoformat(),
+         "timestamp": t.isoformat(), "quantile": q, "value": float(curve[pct_list.index(q)])}
+        for t in mtus for q in pct_list
+    ]
+    with get_session() as s:
+        return calibrate_sigma(
+            s, pid,
+            forecast_records=forecast_records,
+            dam_price_map={t: dam[t] for t in mtus},
+            position_map={t: (dampos[t], gen[t]) for t in mtus},
+            capacity_mwh=cfg["capacity"] * MTU_HOURS,
+            engine_config=EngineConfig(
+                n_scenarios=int(cfg["scenarios"]), confidence=cfg["confidence"], seed=cfg["seed"]
+            ),
+            iar_type=basis,
+        )
+
+
 # --------------------------------------------------------------------------- #
 # Sidebar
 # --------------------------------------------------------------------------- #
