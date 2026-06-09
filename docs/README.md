@@ -73,8 +73,12 @@ Windows, Python 3.13, venv at `venv/`.
 
 ```powershell
 pip install -e ".[dev]"                       # install package (editable) + dev tools
-.\venv\Scripts\python.exe -m pytest -q         # run the full suite (73 tests)
+.\venv\Scripts\python.exe -m pytest -q         # run the full suite (142 tests, hermetic)
 ```
+
+The test suite is **self-contained** — it needs no API key, network, vendor wheel, or
+`windsim` (all external SDKs are mocked/injected). A fresh clone + `pip install -e ".[dev]"`
+should go green immediately. Requires **Python 3.11+** (`tomllib`); developed on 3.13.
 
 The Optimeering API key must live in `.env` as `OPTIMEERING_API_KEY` (gitignored).
 It is never printed, logged, or committed. The client pins the production host
