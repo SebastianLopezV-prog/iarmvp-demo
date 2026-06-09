@@ -80,15 +80,15 @@ class OptimeeringMarketsClient:
         )
 
     # ------------------------------------------------------------------ #
-    def _resolve_dam_series_id(self, area: str) -> int:
-        """Find the DAM cleared-price series id for ``area`` (prefer Nordpool)."""
+    def _resolve_series_id(self, area: str, market: str, series_type: str) -> int:
+        """Find the series id for ``(area, market, series_type)`` (prefer Nordpool)."""
         resp = self._api.get_market_series(
-            area=[area], market=[DAM_MARKET], series_type=[CLEARED_PRICE]
+            area=[area], market=[market], series_type=[series_type]
         )
         items = _items(resp)
         if not items:
             raise LookupError(
-                f"No '{DAM_MARKET}' '{CLEARED_PRICE}' series found for area {area!r}."
+                f"No '{market}' '{series_type}' series found for area {area!r}."
             )
         preferred = [
             it for it in items
@@ -97,15 +97,11 @@ class OptimeeringMarketsClient:
         chosen = (preferred or items)[0]
         return int(_get(chosen, "id"))
 
-    def get_dam_prices(
-        self, area: str, start: Any = "-P1D", end: Any = "P2D"
+    def _fetch_prices(
+        self, area: str, market: str, series_type: str, start: Any, end: Any
     ) -> list[dict[str, Any]]:
-        """Return the DAM cleared (spot) price for ``area`` as normalised records.
-
-        ``start``/``end`` accept ISO 8601 datetimes or durations (e.g. ``-P1D``, ``P2D``).
-        Each record: ``{"price_area", "timestamp" (ISO 8601 UTC), "eur_per_mwh"}``.
-        """
-        sid = self._resolve_dam_series_id(area)
+        """Resolve the series and return its datapoints as normalised price records."""
+        sid = self._resolve_series_id(area, market, series_type)
         data = self._api.get_market(series_id=[sid], start=start, end=end)
         records: list[dict[str, Any]] = []
         for series in _items(data):
@@ -119,6 +115,31 @@ class OptimeeringMarketsClient:
                 )
         records.sort(key=lambda r: r["timestamp"])
         return records
+
+    def get_dam_prices(
+        self, area: str, start: Any = "-P1D", end: Any = "P2D"
+    ) -> list[dict[str, Any]]:
+        """Return the DAM cleared (spot) price for ``area`` as normalised records.
+
+        ``start``/``end`` accept ISO 8601 datetimes or durations (e.g. ``-P1D``, ``P2D``).
+        Each record: ``{"price_area", "timestamp" (ISO 8601 UTC), "eur_per_mwh"}``.
+        """
+        return self._fetch_prices(area, DAM_MARKET, CLEARED_PRICE, start, end)
+
+    def get_imbalance_prices(
+        self, area: str, start: Any = "-P7D", end: Any = "P0D"
+    ) -> list[dict[str, Any]]:
+        """Return the realised **absolute** imbalance price for ``area`` (Task 3.1).
+
+        This is the settled TSO imbalance price (EUR/MWh) — the backtest input that
+        turns positions into realised cost. Distinct from the public SDK's forward
+        imbalance *spread* forecast; this is the after-the-fact absolute price.
+
+        Defaults to a trailing 7-day window (``-P7D``..now), since the backtest
+        consumes settled history. Each record:
+        ``{"price_area", "timestamp" (ISO 8601 UTC), "eur_per_mwh"}``.
+        """
+        return self._fetch_prices(area, IMBALANCE_MARKET, IMBALANCE_PRICE, start, end)
 
 
 # --------------------------------------------------------------------------- #
