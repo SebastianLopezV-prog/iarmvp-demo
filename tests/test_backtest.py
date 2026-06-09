@@ -1,12 +1,14 @@
-"""Realised-cost tests (Task 3.1).
+"""Realised-cost + calibration tests (Tasks 3.1 and 3.3).
 
 Covers the realised imbalance cost computation (gross + spread, sign convention,
 period sum, time-window filter, input intersection), the actual-imbalance-price
-ingestion sinks, and the markets-client imbalance-price fetch (mocked SDK).
+ingestion sinks, the markets-client imbalance-price fetch (mocked SDK), the Kupiec
+POF test, and the end-to-end backtest (exceedance flagging + persistence).
 
-Tasks 3.2/3.3 (vintage join, Kupiec) will add their own tests here later.
+The 3.2 vintage join (``estimate_for_period``) is tested in ``test_replay.py``.
 """
 
+import json
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -17,6 +19,9 @@ from iar.db.models import (
     ActualImbalancePrice,
     DAMPosition,
     DAMPrice,
+    HistoricalPerformanceRecord,
+    IaRResult,
+    SimulationRun,
 )
 from iar.db.session import init_db, make_engine
 from iar.ingestion.flatfile_loader import (
@@ -24,6 +29,11 @@ from iar.ingestion.flatfile_loader import (
     store_actual_imbalance_price_records,
 )
 from iar.ingestion.markets_client import OptimeeringMarketsClient
+from iar.risk.backtest import (
+    kupiec_pof,
+    load_performance_records,
+    run_backtest,
+)
 from iar.risk.realised_cost import compute_realised_cost, realised_period_cost
 
 T0 = datetime(2026, 6, 8, 0, 0, tzinfo=timezone.utc)
