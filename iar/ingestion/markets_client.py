@@ -36,6 +36,10 @@ DAM_MARKET = "DAM"
 CLEARED_PRICE = "cleared price"
 PREFERRED_PUBLISHER = "Nordpool"
 
+# Realised (settled) absolute imbalance price — the backtest input (Task 3.1).
+IMBALANCE_MARKET = "Imbalance"
+IMBALANCE_PRICE = "imbalance price"
+
 
 class OptimeeringMarketsClient:
     """Thin wrapper over ``optipyclient.MarketsApi`` for the DAM cleared (spot) price."""
