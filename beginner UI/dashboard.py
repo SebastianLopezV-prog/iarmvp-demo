@@ -292,6 +292,28 @@ with tab_live:
     c3.metric("Spread IaR", f"{-rep.spread.iar:,.0f} EUR")
     c4.metric("Spread CIaR", f"{-rep.spread.ciar:,.0f} EUR")
 
+    # --- limit status (3.4): live IaR vs configured remaining-day euro-limits --- #
+    _badge = {"hard": "🔴 HARD breach", "soft": "🟠 soft warning", None: "🟢 within limit"}
+    st.markdown("**Limit status** — remaining-day euro-limits (3.4)")
+    try:
+        limits = load_limits()
+        lname = pf_name or "default"
+        lc = st.columns(2)
+        for col, (label, meas) in zip(lc, [("Gross", rep.gross), ("Spread", rep.spread)]):
+            lim = limits.limit_for(lname, label.lower(), "remaining_day")
+            if lim is None:
+                col.markdown(f"**{label}** · _no limit configured_")
+            else:
+                sev = classify_severity(meas.iar, lim)
+                col.markdown(
+                    f"**{label}** · {_badge[sev]}  \n"
+                    f"IaR {meas.iar:,.0f} / limit {lim:,.0f} EUR ({meas.iar / lim:.0%} used)"
+                )
+        st.caption("IaR is in cost terms (positive = cost); a breach is IaR > limit, "
+                   "a soft warning is IaR > 80% of the limit. Limits from `config/limits.toml`.")
+    except Exception as exc:  # noqa: BLE001
+        st.caption(f"Limit config unavailable: {exc}")
+
     left, right = st.columns([3, 2])
     with left:
         basis = st.radio("P&L basis", ["Gross", "Spread"], horizontal=True)
