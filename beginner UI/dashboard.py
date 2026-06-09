@@ -132,34 +132,6 @@ def realised_frame(pid: int) -> pd.DataFrame:
         return compute_realised_cost(s, pid)
 
 
-def join_frame(pid: int) -> pd.DataFrame:
-    """Per delivery day: backfilled estimate (3.2) vs realised cost (3.1)."""
-    with get_session() as s:
-        runs = (s.query(SimulationRun).filter_by(portfolio_id=pid)
-                .order_by(SimulationRun.vintage_ts).all())
-        rows = []
-        for run in runs:
-            cfg = json.loads(run.config_json or "{}")
-            res = {r.iar_type: r for r in run.results}
-            ps, pe = cfg.get("period_start"), cfg.get("period_end")
-            est_g = res["gross"].iar_value if "gross" in res else None
-            est_s = res["spread"].iar_value if "spread" in res else None
-            realised = realised_period_cost(s, pid, start=ps, end=pe) if ps and pe else None
-            have = bool(realised and realised["n_mtus"])
-            rg = realised["gross"] if have else None
-            rs = realised["spread"] if have else None
-            rows.append({
-                "delivery_day": res["gross"].horizon if "gross" in res else "",
-                "est_gross_IaR": est_g,
-                "realised_gross": rg,
-                "gross_exceeded": (rg > est_g) if (have and est_g is not None) else None,
-                "est_spread_IaR": est_s,
-                "realised_spread": rs,
-                "n_mtus_realised": realised["n_mtus"] if realised else 0,
-            })
-        return pd.DataFrame(rows)
-
-
 def populate_demo_backtest(area, pid, pct, curve, dam_map_iso, fallback, cfg):
     """Fill the DB with the inputs the backtest panels need (clearly DEMO).
 
