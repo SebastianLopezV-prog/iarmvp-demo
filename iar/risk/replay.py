@@ -40,14 +40,15 @@ wires the real sources.
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from dataclasses import dataclass
+from datetime import timedelta
 
 import numpy as np
 import pandas as pd
 from sqlalchemy.orm import Session
 
 from iar.db.models import Portfolio, SimulationRun
-from iar.simulation.engine import EngineConfig, run_simulation
+from iar.simulation.engine import EngineConfig, IaRReport, run_simulation
 from iar.simulation.imbalance_model import ImbalanceModel, ImbalanceModelConfig
 from iar.simulation.persistence import persist_report
 from iar.simulation.price_sampler import QuantilePriceSampler
