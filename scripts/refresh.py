@@ -78,7 +78,7 @@ def prune_live_runs() -> int:
 
 def parse_args() -> argparse.Namespace:
     ap = argparse.ArgumentParser(description="Refresh the IaR database (scheduled).")
-    ap.add_argument("--areas", nargs="+", default=["NO1", "NO2", "SE3"])
+    ap.add_argument("--areas", nargs="+", default=["NO2"])
     ap.add_argument("--mode", choices=["fast", "full"], default="fast",
                     help="fast = live run + actuals + backtest; full also backfills the curve")
     ap.add_argument("--actuals-window", default="-P2D",
