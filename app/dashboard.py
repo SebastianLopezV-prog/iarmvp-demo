@@ -564,16 +564,7 @@ def main() -> None:
     st.markdown(_CSS, unsafe_allow_html=True)
     kind = "live"
 
-    # Auto-reload the page periodically; cached reads (ttl=30s) re-fetch the DB, so the
-    # dashboard tracks the scheduled refresh without a manual click. Selections survive
-    # via query params. ``window.parent`` because components run in an iframe.
-    components.html(
-        f"<script>setTimeout(function(){{window.parent.location.reload();}},"
-        f" {AUTO_REFRESH_SECONDS * 1000});</script>",
-        height=0,
-    )
-
-    header_box = st.container()  # filled after we know the selection (renders above tabs)
+    header_ph = st.empty()  # header rendered into here (above the tab strip)
     tabs = st.tabs(["Command Centre", "Risk Analytics", "Historical", "Settings"])
 
     # Settings first (in code) so the selections drive the other tabs.
@@ -581,32 +572,36 @@ def main() -> None:
         pf, basis, confidence, significance = render_settings(kind)
     pid = int(pf["portfolio_id"])
 
-    ov = r_overview(kind, pid, confidence)
-    with header_box:
-        render_header(pf, ov, kind)
+    # The live view re-runs itself in place every AUTO_REFRESH_SECONDS (a Streamlit
+    # fragment, NOT a full page reload), so cached reads (ttl 30s) re-fetch the DB and
+    # the dashboard tracks the scheduled refresh without flicker or losing scroll.
+    @st.fragment(run_every=AUTO_REFRESH_SECONDS)
+    def live_view() -> None:
+        ov = r_overview(kind, pid, confidence)
+        with header_ph.container():
+            render_header(pf, ov, kind)
+        with tabs[0]:
+            if ov is None:
+                st.info("No simulation run stored for this portfolio yet. Run "
+                        f"scripts/run_iar.py --area {pf['price_area']} --store.")
+            else:
+                render_kpis(ov)
+                st.divider()
+                render_intraday(r_intraday(kind, pid, basis), basis)
+                render_heatmaps(r_heatmap(kind, pid, basis), basis)
+                st.divider()
+                left, right = st.columns([3, 2])
+                with left:
+                    render_limit_table(r_limits(kind, pid))
+                with right:
+                    render_alerts(r_alerts(kind, pid))
+        with tabs[1]:
+            render_curve(r_curve(kind, pid, basis), ov, basis)
+            st.caption("Portfolio, Gross/Spread basis and confidence are in the Settings tab.")
+        with tabs[2]:
+            render_backtest(r_backtest(kind, pid, basis, significance), basis)
 
-    with tabs[0]:
-        if ov is None:
-            st.info("No simulation run stored for this portfolio yet. Run "
-                    f"scripts/run_iar.py --area {pf['price_area']} --store.")
-        else:
-            render_kpis(ov)
-            st.divider()
-            render_intraday(r_intraday(kind, pid, basis), basis)
-            render_heatmaps(r_heatmap(kind, pid, basis), basis)
-            st.divider()
-            left, right = st.columns([3, 2])
-            with left:
-                render_limit_table(r_limits(kind, pid))
-            with right:
-                render_alerts(r_alerts(kind, pid))
-
-    with tabs[1]:
-        render_curve(r_curve(kind, pid, basis), ov, basis)
-        st.caption("Portfolio, Gross/Spread basis and confidence are in the Settings tab.")
-
-    with tabs[2]:
-        render_backtest(r_backtest(kind, pid, basis, significance), basis)
+    live_view()
 
 
 if __name__ == "__main__":
