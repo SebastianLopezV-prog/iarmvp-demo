@@ -658,25 +658,32 @@ _MC_STEPS = [
 ]
 
 _PANELS = [
-    ("KPI cards", "Period Gross and Spread IaR for the remaining day against their limits "
-     "and utilisation, plus Peak MTU IaR and the overperformance ratio."),
-    ("Intraday IaR", "Per-MTU view across the day in Norway time. Bars are forecast IaR for "
-     "forward periods; the line is the portfolio position; the dashed line is the per-MTU limit."),
-    ("Forecast IaR heatmap", "The 95th-percentile worst-case cost per period, projected up to "
-     "24 hours ahead. The dotted divider marks the start of the next day. A risk bound, so "
-     "values exceed a typical outcome."),
-    ("Realised cost heatmap", "Actual settled cost per cleared period, on its own diverging "
-     "scale (blue revenue, red cost). A single realised outcome, not a worst case, so it is "
-     "kept on a separate scale."),
-    ("Limit status", "Current IaR against configured euro limits, by limit type (period, "
-     "rolling window, per-MTU) and basis. Limits are a risk-appetite setting in configuration, "
-     "not derived by the tool."),
-    ("Alert feed", "Limit breaches and warnings raised against the most recent run."),
-    ("IaR over time", "The IaR estimate for each stored run against the limit line, showing how "
-     "the figure moves across successive runs."),
-    ("Backtest (Kupiec)", "Each settled period's realised cost versus the estimate that applied "
-     "to it. The Kupiec test checks whether the exceedance rate matches the confidence level "
-     "(about 5% at 95%). Low power over short windows, so read it as an indicator."),
+    ("KPI cards", "target",
+     "Period Gross and Spread IaR for the remaining day against their limits and utilisation, "
+     "plus Peak MTU IaR and the overperformance ratio."),
+    ("Intraday IaR", "activity",
+     "A per-MTU view across the day in Norway time. Bars are forecast IaR for forward periods; "
+     "the line is the portfolio position; the dashed line is the per-MTU limit."),
+    ("Forecast IaR heatmap", "grid",
+     "The 95th-percentile worst-case cost per period, projected up to 24 hours ahead. The dotted "
+     "divider marks the start of the next day. It is a risk bound, so values exceed a typical "
+     "outcome."),
+    ("Realised cost heatmap", "grid",
+     "Actual settled cost per cleared period, on its own diverging scale (blue revenue, red "
+     "cost). A single realised outcome, not a worst case, so it is kept on a separate scale."),
+    ("Limit status", "shield",
+     "Current IaR against configured euro limits, by limit type (period, rolling window, "
+     "per-MTU) and basis. Limits are a risk-appetite setting in configuration, not derived by "
+     "the tool."),
+    ("Alert feed", "bell",
+     "Limit breaches and warnings raised against the most recent run."),
+    ("IaR over time", "trending",
+     "The IaR estimate for each stored run against the limit line, showing how the figure moves "
+     "across successive runs."),
+    ("Backtest (Kupiec)", "clock",
+     "Each settled period's realised cost versus the estimate that applied to it. The Kupiec "
+     "test checks whether the exceedance rate matches the confidence level (about 5% at 95%). It "
+     "has low power over short windows, so it is read as an indicator."),
 ]
 
 
