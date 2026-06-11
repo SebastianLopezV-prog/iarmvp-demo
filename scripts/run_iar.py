@@ -94,30 +94,33 @@ def fetch_dam_map(area: str):
 
 
 def fetch_positions_map(area: str):
-    """Return ({pd.Timestamp(UTC): (dam_pos_mwh, gen_mwh)}, portfolio_name) from the DB.
+    """Return ({pd.Timestamp(UTC): (dam_pos_mwh, gen_mwh)}, portfolio_name, portfolio_id).
 
     Reads the REAL DAM positions + generation forecast that a client loaded (e.g. via
-    scripts/load_windsim_data.py) for the portfolio in ``area``. Empty if none loaded.
+    scripts/load_windsim_data.py) for the portfolio in ``area``. Picks the most recent
+    portfolio in the area that actually HAS positions (so an empty placeholder portfolio
+    doesn't shadow the loaded one), and returns its id so the run is stored on the same
+    portfolio whose positions it used. ``({}, None, None)`` if none loaded.
     """
     init_db()
     with get_session() as s:
-        pf = (
+        pfs = (
             s.query(Portfolio).filter_by(price_area=area)
-            .order_by(Portfolio.portfolio_id.desc()).first()
+            .order_by(Portfolio.portfolio_id.desc()).all()
         )
-        if pf is None:
-            return {}, None
-        dam = {r.timestamp: r.mwh for r in s.query(DAMPosition).filter_by(portfolio_id=pf.portfolio_id)}
-        gen = {
-            r.timestamp: r.forecast_mwh
-            for r in s.query(GenerationForecast).filter_by(portfolio_id=pf.portfolio_id)
-        }
-        # SQLite returns naive UTC datetimes -> normalise to tz-aware UTC for alignment.
-        out = {
-            pd.to_datetime(t, utc=True): (dam[t], gen[t])
-            for t in (set(dam) & set(gen))
-        }
-        return out, pf.name
+        for pf in pfs:
+            dam = {r.timestamp: r.mwh
+                   for r in s.query(DAMPosition).filter_by(portfolio_id=pf.portfolio_id)}
+            gen = {r.timestamp: r.forecast_mwh
+                   for r in s.query(GenerationForecast).filter_by(portfolio_id=pf.portfolio_id)}
+            # SQLite returns naive UTC datetimes -> normalise to tz-aware UTC for alignment.
+            out = {
+                pd.to_datetime(t, utc=True): (dam[t], gen[t])
+                for t in (set(dam) & set(gen))
+            }
+            if out:
+                return out, pf.name, pf.portfolio_id
+        return {}, None, None
 
 
 def stub_portfolio(n_mtus: int, capacity_mw: float, seed: int):
