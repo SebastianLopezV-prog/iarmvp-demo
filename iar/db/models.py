@@ -245,6 +245,11 @@ class SimulationRun(Base):
     n_scenarios: Mapped[int] = mapped_column(Integer, nullable=False)
     seed: Mapped[int] = mapped_column(Integer, nullable=False)
     config_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Optional per-MTU IaR series (gross/spread arrays, peak/rolling scalars, positions
+    # and timestamps) as JSON — drives the dashboard's intraday/heatmap/per-MTU panels.
+    # The period IaR/CIaR summaries still live in IaRResult; this is the per-MTU detail
+    # (architecture still stores summaries, not raw scenarios — these are read-offs).
+    per_mtu_json: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     portfolio: Mapped["Portfolio"] = relationship(back_populates="simulation_runs")
     results: Mapped[list["IaRResult"]] = relationship(
