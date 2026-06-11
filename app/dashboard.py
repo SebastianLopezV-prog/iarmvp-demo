@@ -105,7 +105,9 @@ _CSS = f"""
   div[data-testid="stPlotlyChart"] {{ background: #fff; border: 1px solid #ebedf0;
        border-radius: 14px; padding: 8px 6px; box-shadow: 0 2px 10px rgba(20,24,33,.05); }}
   .stTabs [data-baseweb="tab-list"] {{ gap: 4px; }}
-  .stTabs [data-baseweb="tab"] {{ font-weight: 600; }}
+  .stTabs [data-baseweb="tab"] {{ font-weight: 600; color: #2b3038; }}
+  .stTabs [data-baseweb="tab"] p {{ color: #2b3038 !important; }}
+  .stTabs [aria-selected="true"] p {{ color: {VOLUE_ORANGE} !important; }}
 </style>
 """
 
