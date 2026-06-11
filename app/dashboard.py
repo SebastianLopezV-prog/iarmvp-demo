@@ -448,6 +448,15 @@ def main() -> None:
     st.markdown(_CSS, unsafe_allow_html=True)
     kind = "live"
 
+    # Auto-reload the page periodically; cached reads (ttl=30s) re-fetch the DB, so the
+    # dashboard tracks the scheduled refresh without a manual click. Selections survive
+    # via query params. ``window.parent`` because components run in an iframe.
+    components.html(
+        f"<script>setTimeout(function(){{window.parent.location.reload();}},"
+        f" {AUTO_REFRESH_SECONDS * 1000});</script>",
+        height=0,
+    )
+
     header_box = st.container()  # filled after we know the selection (renders above tabs)
     tabs = st.tabs(["⊞ Command Centre", "📈 Risk Analytics", "🗓 Historical", "⚙ Settings"])
 
