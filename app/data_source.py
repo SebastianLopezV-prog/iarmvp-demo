@@ -210,10 +210,53 @@ class ServiceDataSource(DataSource):
             "n_breaches": int((sev == "hard").sum()),
         }
 
-    # -- per-MTU panels (now real, from the stored per-MTU read-off) ------- #
+    # -- per-MTU panels: realised (past) + forecast (future) = full day ---- #
+    def _intraday_union(self, portfolio_id: int, basis: str) -> pd.DataFrame:
+        """Merge the forecast per-MTU series (future) with realised cost (past).
+
+        Produces one row per MTU of the current delivery day with both a
+        ``forecast_iar`` and a ``realised_iar`` column (either may be NaN). This is
+        what makes the heatmap a gap-free day: settled MTUs carry realised cost,
+        un-settled ones carry the forecast IaR. Timestamps are returned in local time.
+        """
+        fc = self._svc.get_intraday(portfolio_id)
+        # Delivery day (local) to bound the realised lookup to the same calendar day.
+        if not fc.empty:
+            day_local = pd.to_datetime(fc["timestamp"], utc=True).min().tz_convert(
+                DISPLAY_TZ
+            ).normalize()
+        else:
+            day_local = pd.Timestamp.now(tz=DISPLAY_TZ).normalize()
+        day_start = day_local.tz_convert("UTC").to_pydatetime()
+        day_end = (day_local + pd.Timedelta(days=1)).tz_convert("UTC").to_pydatetime()
+        rl = self._svc.get_realised_intraday(portfolio_id, day_start, day_end)
+
+        fc_part = pd.DataFrame(columns=["timestamp", "forecast_iar", "position_mwh"])
+        if not fc.empty:
+            fc_part = pd.DataFrame(
+                {
+                    "timestamp": pd.to_datetime(fc["timestamp"], utc=True),
+                    "forecast_iar": fc[f"{basis}_iar"],
+                    "position_mwh": fc["position_mwh"],
+                }
+            )
+        rl_part = pd.DataFrame(columns=["timestamp", "realised_iar"])
+        if not rl.empty:
+            rl_part = pd.DataFrame(
+                {
+                    "timestamp": pd.to_datetime(rl["timestamp"], utc=True),
+                    "realised_iar": rl[f"realised_{basis}_cost"],
+                }
+            )
+        if fc_part.empty and rl_part.empty:
+            return pd.DataFrame(columns=["timestamp", "forecast_iar", "realised_iar", "position_mwh"])
+        merged = pd.merge(fc_part, rl_part, on="timestamp", how="outer").sort_values("timestamp")
+        merged["timestamp"] = merged["timestamp"].dt.tz_convert(DISPLAY_TZ)
+        return merged.reset_index(drop=True)
+
     def intraday(self, portfolio_id: int, *, basis: str = "gross") -> pd.DataFrame:
-        raw = self._svc.get_intraday(portfolio_id)
-        if raw.empty:
+        merged = self._intraday_union(portfolio_id, basis)
+        if merged.empty:
             return _EMPTY_INTRADAY.copy()
         # Per-MTU limit for this basis (peak limit), for the chart's limit line.
         overview = self._svc.get_limit_overview(portfolio_id)
@@ -222,27 +265,28 @@ class ServiceDataSource(DataSource):
             row = overview[(overview["iar_type"] == basis) & (overview["limit_type"] == "per_mtu")]
             if not row.empty:
                 mtu_limit = float(row["limit_value"].iloc[0])
-        utc_ts = pd.to_datetime(raw["timestamp"], utc=True)
-        is_past = utc_ts < pd.Timestamp.now(tz="UTC")
+        now = pd.Timestamp.now(tz=DISPLAY_TZ)
         return pd.DataFrame(
             {
-                "timestamp": utc_ts.dt.tz_convert(DISPLAY_TZ),  # local time for the axis
-                "forecast_iar": raw[f"{basis}_iar"],
-                "realised_iar": pd.NA,  # realised per-MTU cost needs actuals (not yet settled)
-                "position_mwh": raw["position_mwh"],
+                "timestamp": merged["timestamp"],
+                "forecast_iar": merged.get("forecast_iar"),
+                "realised_iar": merged.get("realised_iar"),
+                "position_mwh": merged.get("position_mwh"),
                 "mtu_limit": mtu_limit,
-                "is_past": is_past,
+                "is_past": merged["timestamp"] < now,
             }
         )
 
     def heatmap(self, portfolio_id: int, *, basis: str = "gross") -> pd.DataFrame:
-        raw = self._svc.get_intraday(portfolio_id)
-        if raw.empty:
+        merged = self._intraday_union(portfolio_id, basis)
+        if merged.empty:
             return _EMPTY_HEATMAP.copy()
-        ts = pd.to_datetime(raw["timestamp"], utc=True).dt.tz_convert(DISPLAY_TZ)  # local hours
-        return pd.DataFrame(
-            {"hour": ts.dt.hour, "quarter": ts.dt.minute, "iar": raw[f"{basis}_iar"]}
-        )
+        # Heatmap intensity = forecast IaR where un-settled, else |realised cost|.
+        fc = merged.get("forecast_iar")
+        rl = merged.get("realised_iar")
+        value = fc.where(fc.notna(), rl.abs() if rl is not None else fc)
+        ts = merged["timestamp"]
+        return pd.DataFrame({"hour": ts.dt.hour, "quarter": ts.dt.minute, "iar": value})
 
     # -- limits (all types: day / rolling / per-MTU) ----------------------- #
     def limit_status(self, portfolio_id: int) -> pd.DataFrame:
