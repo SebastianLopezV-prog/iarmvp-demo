@@ -1,0 +1,12 @@
+# Pin the dashboard to a light theme so text is always dark on the light background
+# (otherwise a browser/system in dark mode renders tab labels and widget text white,
+# which is invisible against the light layout).
+[theme]
+base = "light"
+primaryColor = "#FF5C39"
+backgroundColor = "#f5f6f8"
+secondaryBackgroundColor = "#ffffff"
+textColor = "#141821"
+
+[browser]
+gatherUsageStats = false
