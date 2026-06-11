@@ -74,7 +74,7 @@ _CSS = f"""
                      padding: 1px 7px; font-weight: 700; font-size: .72rem; letter-spacing: 1px; }}
 
   .sec {{ font-size: 1.05rem; font-weight: 800; letter-spacing: .4px;
-          color: {INK}; margin: 10px 0 4px; }}
+          color: {INK}; margin: 16px 0 6px; }}
   /* Make Streamlit captions readable (they default to a very faint grey). */
   [data-testid="stCaptionContainer"], [data-testid="stCaptionContainer"] p {{
       color: #4b5563 !important; font-size: 0.84rem !important; }}
