@@ -517,7 +517,7 @@ def main() -> None:
             render_kpis(ov)
             st.divider()
             render_intraday(r_intraday(kind, pid, basis), basis)
-            render_heatmap(r_heatmap(kind, pid, basis), basis)
+            render_heatmaps(r_heatmap(kind, pid, basis), basis)
             st.divider()
             left, right = st.columns([3, 2])
             with left:
