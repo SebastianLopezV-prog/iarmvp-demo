@@ -549,22 +549,10 @@ def render_settings(kind: str):
         {"pf": str(idx), "basis": basis, "conf": str(confidence), "sig": str(significance)}
     )
 
-    if st.button("Refresh data now", use_container_width=True):
+    if st.button("Refresh now", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
-    st.caption("The view auto-refreshes every 60s; data is kept current by the scheduled "
-               "scripts/refresh.py pipeline (Windows Task Scheduler, every 15 min).")
-
-    st.divider()
-    st.caption("Data is read live from the SQLite database via iar.service; the dashboard never "
-               "calls Optimeering or the markets SDK directly. The pipeline (live feeds to DB) "
-               "is run by the backend scripts:")
-    st.code("python scripts/refresh.py            # one full cycle, all areas\n"
-            "python scripts/run_iar.py --area NO2 --store\n"
-            "python scripts/backfill_iar.py --area NO2 --start=-P5D --end=P0D",
-            language="bash")
-    st.caption("Confidence (alpha) is the level the stored run was computed at; changing it here "
-               "drives the backtest target. Re-run the pipeline to re-estimate at a new alpha.")
+    st.caption("Figures update automatically every 15 minutes; use Refresh to pull the latest now.")
     return pf, basis, confidence, significance
 
 
