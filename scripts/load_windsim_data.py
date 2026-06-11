@@ -61,14 +61,15 @@ def parse_args() -> argparse.Namespace:
     return ap.parse_args()
 
 
-def ensure_windsim_db(db_path: Path, days: int, seed: int, regen: bool) -> None:
-    """Generate the windsim DuckDB for today..today+days if missing (or --regen)."""
+def ensure_windsim_db(db_path: Path, days: int, seed: int, regen: bool,
+                      start_date: str | None = None) -> None:
+    """Generate the windsim DuckDB for start..start+days if missing (or --regen)."""
     if db_path.exists() and not regen:
         return
     db_path.parent.mkdir(parents=True, exist_ok=True)
     if db_path.exists():
         db_path.unlink()
-    start = date.today()
+    start = date.fromisoformat(start_date) if start_date else date.today()
     end = start + timedelta(days=days)
     print(f"Generating windsim data {start}..{end} (seed {seed}) -> {db_path}")
     subprocess.run(
