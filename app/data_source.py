@@ -383,15 +383,14 @@ class DemoDataSource(DataSource):
 
     # -- limits ------------------------------------------------------------ #
     def limit_status(self, portfolio_id: int) -> pd.DataFrame:
-        rng = self._rng(portfolio_id + 3)
         rows = []
         for basis in ("gross", "spread"):
-            forecast, _ = self._mtu_profile(portfolio_id, basis, 0.95)
-            period = float(forecast.sum() * (0.62 + 0.04 * rng.random()))
-            peak = float(forecast.max())
-            # Rolling 4h window = worst contiguous 16-MTU sum (illustrative).
-            window = float(pd.Series(forecast).rolling(16).sum().max())
-            current = {"remaining_day": period, "per_mtu": peak, "rolling_window": window}
+            forecast, _ = self._mtu_series(portfolio_id, basis, 0.95)
+            current = {
+                "remaining_day": self._current(portfolio_id, basis, "remaining_day", 0.95),
+                "rolling_window": self._current(portfolio_id, basis, "rolling_window", 0.95),
+                "per_mtu": float(forecast.max()),  # the worst single MTU on the chart
+            }
             for limit_type in ("remaining_day", "rolling_window", "per_mtu"):
                 limit = _DEMO_LIMITS[basis][limit_type]
                 cur = current[limit_type]
