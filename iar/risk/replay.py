@@ -98,7 +98,12 @@ def _pick_vintage(by_vintage: dict, day_start: pd.Timestamp, day_end: pd.Timesta
 
 @dataclass
 class PeriodEstimate:
-    """One day-ahead IaR estimate: the period, its chosen vintage, and the report."""
+    """One day-ahead IaR estimate: the period, its chosen vintage, and the report.
+
+    Also carries the per-MTU inputs (``timestamps`` ISO strings, ``dam_pos``, ``gen``)
+    so the backfill can persist the same per-MTU read-off the live run does — i.e. a
+    backfilled *complete* delivery day yields a full-day intraday/heatmap.
+    """
 
     day_start: pd.Timestamp
     day_end: pd.Timestamp
@@ -106,6 +111,9 @@ class PeriodEstimate:
     vintage: pd.Timestamp  # the day-ahead forecast event_time used
     n_mtus: int
     report: IaRReport
+    timestamps: list[str]
+    dam_pos: np.ndarray
+    gen: np.ndarray
 
 
 def estimate_periods(
