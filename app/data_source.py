@@ -282,21 +282,14 @@ class ServiceDataSource(DataSource):
         )
 
     def heatmap(self, portfolio_id: int, *, basis: str = "gross") -> pd.DataFrame:
-        # Returns BOTH series so the UI can draw two separate heatmaps (each on its
-        # own scale): forecast IaR (worst-case, future) and realised cost (actual,
-        # past). They are different metrics and must never share a colour scale.
+        # Returns local-time timestamps + BOTH series so the UI can draw two separate
+        # heatmaps (each on its own scale): forecast IaR (worst-case, future, up to
+        # 24h ahead) and realised cost (actual, settled today). Different metrics that
+        # must never share a colour scale; the timestamp lets the UI demarcate days.
         merged = self._intraday_union(portfolio_id, basis)
         if merged.empty:
             return _EMPTY_HEATMAP.copy()
-        ts = merged["timestamp"]
-        return pd.DataFrame(
-            {
-                "hour": ts.dt.hour,
-                "quarter": ts.dt.minute,
-                "forecast_iar": merged.get("forecast_iar"),
-                "realised_iar": merged.get("realised_iar"),
-            }
-        )
+        return merged[["timestamp", "forecast_iar", "realised_iar"]].reset_index(drop=True)
 
     # -- limits (all types: day / rolling / per-MTU) ----------------------- #
     def limit_status(self, portfolio_id: int) -> pd.DataFrame:
