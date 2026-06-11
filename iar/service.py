@@ -24,6 +24,7 @@ Sign convention is the engine's throughout: IaR/CIaR and realised cost are in
 
 from __future__ import annotations
 
+import json
 from contextlib import contextmanager
 from typing import Iterator
 
@@ -32,7 +33,7 @@ from sqlalchemy.orm import Session
 
 from iar.db.models import IaRResult, Portfolio, SimulationRun
 from iar.db.session import get_session, init_db
-from iar.risk.alerts import check_run, load_alerts, load_limits
+from iar.risk.alerts import check_run, classify_severity, load_alerts, load_limits
 from iar.risk.backtest import run_backtest
 
 __all__ = [
@@ -41,9 +42,21 @@ __all__ = [
     "get_latest_iar",
     "get_iar_curve",
     "get_limit_status",
+    "get_limit_overview",
+    "get_intraday",
     "get_alerts",
     "get_backtest_summary",
 ]
+
+
+def _latest_run(s: Session, portfolio_id: int) -> SimulationRun | None:
+    """The portfolio's newest run (by run_ts then run_id), or ``None``."""
+    return (
+        s.query(SimulationRun)
+        .filter_by(portfolio_id=portfolio_id)
+        .order_by(SimulationRun.run_ts.desc(), SimulationRun.run_id.desc())
+        .first()
+    )
 
 
 @contextmanager
