@@ -1127,8 +1127,21 @@ def main() -> None:
     with tabs[1]:
         @st.fragment(run_every=AUTO_REFRESH_SECONDS)
         def _risk_analytics() -> None:
-            render_curve(r_curve(kind, pid, basis), r_overview(kind, pid, confidence), basis)
-            st.caption("Portfolio, Gross/Spread basis and confidence are in the Settings tab.")
+            ov = r_overview(kind, pid, confidence)
+            if ov is None:
+                st.info("No data available for this portfolio yet.")
+                return
+            render_analytics_kpis(ov, basis)
+            st.divider()
+            render_curve(r_curve(kind, pid, basis), ov, basis)
+            st.divider()
+            intra = r_intraday(kind, pid, basis)
+            left, right = st.columns(2)
+            with left:
+                render_gross_spread(r_limits(kind, pid))
+            with right:
+                render_concentration(intra, basis)
+            st.caption("Portfolio, Gross/Spread basis and confidence are set in the Settings tab.")
         _risk_analytics()
 
     with tabs[2]:
