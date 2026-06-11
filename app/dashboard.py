@@ -90,7 +90,9 @@ _CSS = f"""
   table.lim {{ width: 100%; border-collapse: collapse; }}
   table.lim th {{ text-align: left; color: {MUTED}; font-size: 0.72rem; font-weight: 700;
                   text-transform: uppercase; letter-spacing: .4px; padding: 0 8px 8px; }}
-  table.lim td {{ padding: 9px 8px; border-top: 1px solid #eef0f2; font-size: 0.86rem; }}
+  table.lim td {{ padding: 9px 8px; border-top: 1px solid #eef0f2; font-size: 0.88rem;
+                  color: {INK}; }}
+  table.lim td:first-child {{ font-weight: 600; }}
 
   .feed {{ border-left: 3px solid #d7dade; padding: 8px 12px; margin-bottom: 9px;
            background: #fff; border-radius: 0 10px 10px 0; box-shadow: 0 1px 6px rgba(20,24,33,.04); }}
