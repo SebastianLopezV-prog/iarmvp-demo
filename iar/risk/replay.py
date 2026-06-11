@@ -275,6 +275,7 @@ def backfill_iar(
                 "period_end": est.day_end.isoformat(),
                 "n_mtus": est.n_mtus,
             },
+            per_mtu=build_per_mtu(est.report, est.timestamps, est.dam_pos, est.gen),
         )
         runs.append(run)
 
