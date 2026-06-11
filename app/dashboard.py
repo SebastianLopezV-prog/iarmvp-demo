@@ -454,8 +454,7 @@ def render_backtest(bt: dict, basis: str) -> None:
     section(f"Backtest: {basis.capitalize()} IaR vs realised cost (Kupiec POF)")
     periods = bt.get("periods", pd.DataFrame())
     if periods is None or periods.empty:
-        st.info("No settled periods to backtest yet. The scheduled pipeline accrues these as "
-                "delivery days settle.")
+        st.info("No settled periods to show yet.")
         return
     c = st.columns(5)
     c[0].metric("Periods", bt["n_periods"])
