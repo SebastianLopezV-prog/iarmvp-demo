@@ -18,7 +18,6 @@ import pandas as pd
 import plotly.colors as pcolors
 import plotly.graph_objects as go
 import streamlit as st
-import streamlit.components.v1 as components
 from plotly.subplots import make_subplots
 
 #: Auto-reload the page every N seconds so the view tracks the refreshed database.
