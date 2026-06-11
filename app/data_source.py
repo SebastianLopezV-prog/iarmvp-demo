@@ -480,11 +480,7 @@ class DemoDataSource(DataSource):
     # -- heatmap ----------------------------------------------------------- #
     def heatmap(self, portfolio_id: int, *, basis: str = "gross") -> pd.DataFrame:
         df = self.intraday(portfolio_id, basis=basis)
-        df = df.assign(
-            hour=[t.hour for t in df["timestamp"]],
-            quarter=[t.minute for t in df["timestamp"]],
-        )
-        return df[["hour", "quarter", "forecast_iar", "realised_iar"]]
+        return df[["timestamp", "forecast_iar", "realised_iar"]]
 
     # -- limits ------------------------------------------------------------ #
     def limit_status(self, portfolio_id: int) -> pd.DataFrame:
