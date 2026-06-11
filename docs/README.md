@@ -250,9 +250,9 @@ Engineering / platform
 
 14. SQLite, single process, no migrations. The schema is created with `create_all`
     (no Alembic), with no concurrency, auth, or multi-tenancy.
-15. The shown UI is throwaway. `beginner UI/dashboard.py` reaches into backend modules
-    directly. The frozen `service.py` exists, but the real UI (`app/dashboard.py`)
-    that should consume it is not built.
+15. No production UI yet. An early throwaway demo UI was removed; the frozen
+    `service.py` exists, but the real UI (`app/dashboard.py`) that consumes it is built
+    in Week 4.1.
 16. Batch, not real-time. Everything runs manually via scripts. There is no
     event-driven recompute on a new forecast, position, or MTU passage, no 15-minute
     cadence, and no webhooks or streaming (deck Challenge 4).
