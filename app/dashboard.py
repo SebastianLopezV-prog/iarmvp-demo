@@ -21,7 +21,7 @@ import streamlit as st
 from plotly.subplots import make_subplots
 
 #: The live view re-reads the database (in place) every N seconds.
-AUTO_REFRESH_SECONDS = 120
+AUTO_REFRESH_SECONDS = 300
 
 # ``streamlit run app/dashboard.py`` puts app/ on sys.path[0]; make the sibling
 # import robust regardless of the working directory the app is launched from.
