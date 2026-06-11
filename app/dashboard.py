@@ -38,7 +38,11 @@ MUTED = "#6b7280"
 OK_GREEN = "#1f9d57"
 WARN_AMBER = "#E08A00"
 BREACH_RED = "#D8453B"
+BLUE = "#2A7FD4"
+PURPLE = "#8A5CF6"
 FONT = "Inter, 'Segoe UI', system-ui, -apple-system, sans-serif"
+#: Accent palette cycled across the Usage feature cards.
+FEAT_PALETTE = [VOLUE_ORANGE, TEAL, BLUE, PURPLE, OK_GREEN, WARN_AMBER, BREACH_RED]
 
 #: (label, colour) per severity. ``None`` => within limit.
 SEVERITY = {
