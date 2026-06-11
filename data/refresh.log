@@ -1659,3 +1659,19 @@ note: with --basis both, only GROSS records were persisted (HistoricalPerformanc
 --- NO2: realised prices ---
 --- NO2: backtest ---
 [refresh] done in 177s; pruned 1 stale live run(s).
+================================================================
+IaR Monte Carlo  |  area=NO2  MTUs=127  scenarios=10,000  confidence=95%
+forecast vintage : 2026-06-11T14:07:06.390044+00:00   (LIVE Optimeering spread)
+DAM spot price   : LIVE (Optimeering DAM cleared price, internal SDK)
+portfolio        : REAL - 'NO2 Wind' loaded via client CSV path (windsim)
+imbalance model  : normal, sigma=10% of capacity
+================================================================
+GROSS  | IaR =       +4,778 EUR   CIaR =       +5,835 EUR   mean =         +459 EUR
+SPREAD | IaR =         +821 EUR   CIaR =       +1,046 EUR   mean =           -2 EUR
+================================================================
+IaR = worst-case settlement cost at the confidence level (positive = cost).
+CIaR = average cost in the worst (1 - confidence) tail.
+NOTE: spread + DAM spot LIVE; positions/generation REAL (windsim) when loaded; only the imbalance sigma remains a parametric stub (calibrated in Week 3).
+================================================================
+[stored] SimulationRun #72 (portfolio #2) + 2 IaRResult rows -> C:\Users\sebastian.lopez\OneDrive - Volue AS\Documents\Code\IAR MVP\data\iar.db
+[alerts] no limit breaches
