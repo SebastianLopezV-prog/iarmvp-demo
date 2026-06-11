@@ -233,13 +233,20 @@ class ServiceDataSource(DataSource):
 
         fc_part = pd.DataFrame(columns=["timestamp", "forecast_iar", "position_mwh"])
         if not fc.empty:
-            fc_part = pd.DataFrame(
-                {
-                    "timestamp": pd.to_datetime(fc["timestamp"], utc=True),
-                    "forecast_iar": fc[f"{basis}_iar"],
-                    "position_mwh": fc["position_mwh"],
-                }
-            )
+            # The live forecast can run past midnight into tomorrow; keep only the
+            # current delivery day so tomorrow's MTUs don't collapse onto the same
+            # hour-of-day grid (which would wrongly fill the "morning").
+            fc_utc = pd.to_datetime(fc["timestamp"], utc=True)
+            day_mask = (fc_utc >= pd.Timestamp(day_start)) & (fc_utc < pd.Timestamp(day_end))
+            fc_day = fc[day_mask.to_numpy()]
+            if not fc_day.empty:
+                fc_part = pd.DataFrame(
+                    {
+                        "timestamp": pd.to_datetime(fc_day["timestamp"], utc=True),
+                        "forecast_iar": fc_day[f"{basis}_iar"],
+                        "position_mwh": fc_day["position_mwh"],
+                    }
+                )
         rl_part = pd.DataFrame(columns=["timestamp", "realised_iar"])
         if not rl.empty:
             rl_part = pd.DataFrame(
