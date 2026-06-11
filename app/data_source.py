@@ -351,7 +351,7 @@ class DemoDataSource(DataSource):
 
     # -- intraday ---------------------------------------------------------- #
     def intraday(self, portfolio_id: int, *, basis: str = "gross") -> pd.DataFrame:
-        forecast, position = self._mtu_profile(portfolio_id, basis, 0.95)
+        forecast, position = self._mtu_series(portfolio_id, basis, 0.95)
         n = MTUS_PER_DAY
         start = _DEMO_NOW.replace(hour=0, minute=0, second=0, microsecond=0)
         ts = [start + timedelta(minutes=MTU_MINUTES * i) for i in range(n)]
