@@ -357,9 +357,10 @@ def main() -> None:
     with st.sidebar:
         st.markdown("### ⚡ IaR Controls")
         src_label = st.radio(
-            "Data source", ["Demo (synthetic)", "Live (database)"], index=0,
-            help="Demo = self-contained synthetic feed (no DB/key/network). "
-                 "Live = real pipeline output via iar.service (SQLite).",
+            "Data source", ["Live (database)", "Demo (synthetic)"], index=0,
+            help="Live = real pipeline output via iar.service (SQLite); fed by the backend "
+                 "scripts (run_iar.py etc.), never the UI. Demo = self-contained synthetic "
+                 "feed (no DB/key/network) for a swap-in demo.",
         )
         kind = "live" if src_label.startswith("Live") else "demo"
         if st.button("↻ Refresh data", use_container_width=True):
