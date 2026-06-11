@@ -131,8 +131,8 @@ _CSS = f"""
   .pipe-box {{ flex: 1; min-width: 140px; background: #fff; border: 1px solid #ebedf0;
                border-top: 3px solid {VOLUE_ORANGE}; border-radius: 12px; padding: 11px 13px;
                box-shadow: 0 2px 10px rgba(20,24,33,.05); }}
-  .pipe-box .t {{ font-weight: 700; color: {INK}; font-size: 0.88rem; }}
-  .pipe-box .s {{ font-size: 0.76rem; color: {MUTED}; margin-top: 3px; line-height: 1.35; }}
+  .pipe-box .t {{ font-weight: 700; color: {INK}; font-size: 0.95rem; }}
+  .pipe-box .s {{ font-size: 0.83rem; color: {MUTED}; margin-top: 3px; line-height: 1.4; }}
   .pipe-arrow {{ display: flex; align-items: center; justify-content: center; padding: 0 9px; }}
   .pipe-arrow::after {{ content: ''; width: 0; height: 0; border-top: 7px solid transparent;
                         border-bottom: 7px solid transparent; border-left: 11px solid {VOLUE_ORANGE}; }}
