@@ -561,7 +561,7 @@ def main() -> None:
     st.markdown(_CSS, unsafe_allow_html=True)
     kind = "live"
 
-    header_ph = st.empty()  # header rendered into here (above the tab strip)
+    header_box = st.container()  # header rendered once, above the tab strip
     tabs = st.tabs(["Command Centre", "Risk Analytics", "Historical", "Settings"])
 
     # Settings first (in code) so the selections drive the other tabs.
@@ -569,36 +569,44 @@ def main() -> None:
         pf, basis, confidence, significance = render_settings(kind)
     pid = int(pf["portfolio_id"])
 
-    # The live view re-runs itself in place every AUTO_REFRESH_SECONDS (a Streamlit
-    # fragment, NOT a full page reload), so cached reads (ttl 30s) re-fetch the DB and
-    # the dashboard tracks the scheduled refresh without flicker or losing scroll.
-    @st.fragment(run_every=AUTO_REFRESH_SECONDS)
-    def live_view() -> None:
-        ov = r_overview(kind, pid, confidence)
-        with header_ph.container():
-            render_header(pf, ov, kind)
-        with tabs[0]:
-            if ov is None:
-                st.info("No simulation run stored for this portfolio yet. Run "
-                        f"scripts/run_iar.py --area {pf['price_area']} --store.")
-            else:
-                render_kpis(ov)
-                st.divider()
-                render_intraday(r_intraday(kind, pid, basis), basis)
-                render_heatmaps(r_heatmap(kind, pid, basis), basis)
-                st.divider()
-                left, right = st.columns([3, 2])
-                with left:
-                    render_limit_table(r_limits(kind, pid))
-                with right:
-                    render_alerts(r_alerts(kind, pid))
-        with tabs[1]:
-            render_curve(r_curve(kind, pid, basis), ov, basis)
-            st.caption("Portfolio, Gross/Spread basis and confidence are in the Settings tab.")
-        with tabs[2]:
-            render_backtest(r_backtest(kind, pid, basis, significance), basis)
+    with header_box:
+        render_header(pf, r_overview(kind, pid, confidence), kind)
 
-    live_view()
+    # Each tab's content lives in its own fragment that re-runs in place every
+    # AUTO_REFRESH_SECONDS (no full page reload). Defining the fragment INSIDE the tab
+    # means it owns that tab's slot and REPLACES its output on each rerun, so content
+    # never duplicates. Cached reads (ttl 30s) re-fetch the DB on each rerun.
+    with tabs[0]:
+        @st.fragment(run_every=AUTO_REFRESH_SECONDS)
+        def _command_centre() -> None:
+            ov = r_overview(kind, pid, confidence)
+            if ov is None:
+                st.info("No data available for this portfolio yet.")
+                return
+            render_kpis(ov)
+            st.divider()
+            render_intraday(r_intraday(kind, pid, basis), basis)
+            render_heatmaps(r_heatmap(kind, pid, basis), basis)
+            st.divider()
+            left, right = st.columns([3, 2])
+            with left:
+                render_limit_table(r_limits(kind, pid))
+            with right:
+                render_alerts(r_alerts(kind, pid))
+        _command_centre()
+
+    with tabs[1]:
+        @st.fragment(run_every=AUTO_REFRESH_SECONDS)
+        def _risk_analytics() -> None:
+            render_curve(r_curve(kind, pid, basis), r_overview(kind, pid, confidence), basis)
+            st.caption("Portfolio, Gross/Spread basis and confidence are in the Settings tab.")
+        _risk_analytics()
+
+    with tabs[2]:
+        @st.fragment(run_every=AUTO_REFRESH_SECONDS)
+        def _historical() -> None:
+            render_backtest(r_backtest(kind, pid, basis, significance), basis)
+        _historical()
 
 
 if __name__ == "__main__":
