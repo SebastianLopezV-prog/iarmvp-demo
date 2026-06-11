@@ -487,7 +487,7 @@ class DemoDataSource(DataSource):
             hour=[t.hour for t in df["timestamp"]],
             quarter=[t.minute for t in df["timestamp"]],
         )
-        return df[["hour", "quarter", "forecast_iar"]].rename(columns={"forecast_iar": "iar"})
+        return df[["hour", "quarter", "forecast_iar", "realised_iar"]]
 
     # -- limits ------------------------------------------------------------ #
     def limit_status(self, portfolio_id: int) -> pd.DataFrame:
