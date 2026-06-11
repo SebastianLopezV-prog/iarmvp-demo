@@ -621,22 +621,23 @@ _PANELS = [
 
 
 def _iar_illustration() -> go.Figure:
-    """A small illustrative distribution showing where IaR and CIaR sit (synthetic)."""
+    """Illustrative fat-tailed (Student-t) distribution; IaR and CIaR on the bottom-5% tail."""
     rng = np.random.default_rng(7)
-    cost = rng.standard_t(df=6, size=40000) * 950.0 + 200.0  # illustrative EUR, heavy tail
-    q95 = float(np.quantile(cost, 0.95))
-    ciar = float(cost[cost >= q95].mean())
+    x = rng.standard_t(df=3, size=60000) * 800.0  # Student-t, fat tails (illustrative)
+    q05 = float(np.quantile(x, 0.05))             # bottom 5%
+    es = float(x[x <= q05].mean())                # average of the bottom 5%
+    lo, hi = (float(v) for v in np.quantile(x, [0.003, 0.997]))
     fig = go.Figure()
-    fig.add_histogram(x=cost, nbinsx=70, marker_color="#cdd3da", marker_line_width=0,
-                      name="Scenarios")
-    fig.add_vrect(x0=q95, x1=float(cost.max()), fillcolor=BREACH_RED, opacity=0.12, line_width=0)
-    fig.add_vline(x=q95, line=dict(color=VOLUE_ORANGE, width=2.5),
-                  annotation_text="IaR (95th pct)", annotation_position="top")
-    fig.add_vline(x=ciar, line=dict(color=BREACH_RED, width=2, dash="dot"),
-                  annotation_text="CIaR (mean of worst 5%)", annotation_position="top right")
+    fig.add_histogram(x=x, xbins=dict(start=lo, end=hi, size=(hi - lo) / 150),
+                      marker_color="#cdd3da", marker_line_width=0)
+    fig.add_vrect(x0=lo, x1=q05, fillcolor=BREACH_RED, opacity=0.12, line_width=0)
+    fig.add_vline(x=q05, line=dict(color=VOLUE_ORANGE, width=2.5),
+                  annotation_text="IaR (bottom 5%)", annotation_position="top")
+    fig.add_vline(x=es, line=dict(color=BREACH_RED, width=2, dash="dot"),
+                  annotation_text="CIaR (mean of bottom 5%)", annotation_position="bottom left")
     _style_fig(fig)
-    fig.update_layout(height=250, showlegend=False, bargap=0.02)
-    fig.update_xaxes(title_text="Simulated horizon cost (illustrative EUR; positive = cost)")
+    fig.update_layout(height=260, showlegend=False, bargap=0.02)
+    fig.update_xaxes(range=[lo, hi], title_text="Simulated outcome (illustrative; lower is worse)")
     fig.update_yaxes(title_text="Scenarios", showticklabels=False)
     return fig
 
