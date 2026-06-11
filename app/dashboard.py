@@ -318,7 +318,7 @@ def render_intraday(df: pd.DataFrame, basis: str) -> None:
         fig.add_hline(y=mtu_limit, line=dict(color=BREACH_RED, dash="dash"),
                       annotation_text="MTU limit", annotation_position="top left")
     _style_fig(fig)
-    fig.update_layout(barmode="overlay", height=340, bargap=0.2)
+    fig.update_layout(barmode="overlay", height=380, bargap=0.2)
     fig.update_yaxes(title_text=f"{basis.capitalize()} IaR (EUR)", secondary_y=False)
     fig.update_yaxes(title_text="Position (MWh)", secondary_y=True, showgrid=False)
     fig.update_xaxes(title_text="Time (Norway, CET/CEST)")
