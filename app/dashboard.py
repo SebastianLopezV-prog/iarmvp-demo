@@ -338,12 +338,15 @@ def _rounded_heatmap(grid, *, colorscale, colorbar_title: str, diverging: bool =
         font=dict(family=FONT, size=12, color="#374151"),
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
     )
+    axis_tick = dict(size=13, color="#2b3038")
+    axis_title = dict(size=12.5, color="#4b5563")
     fig.update_xaxes(range=[-0.2, 24.2], tickvals=[i + 0.5 for i in range(len(hours))],
                      ticktext=[f"{h:02d}" for h in hours], showgrid=False, zeroline=False,
-                     title_text="Hour of day (00-23, Norway time)")
+                     tickfont=axis_tick, title_text="Hour of day (00-23, Norway time)",
+                     title_font=axis_title)
     fig.update_yaxes(range=[-0.2, nq + 0.2], tickvals=[i + 0.5 for i in range(nq)],
                      ticktext=[f":{q:02d}" for q in quarters], showgrid=False, zeroline=False,
-                     title_text="Quarter")
+                     tickfont=axis_tick, title_text="Quarter", title_font=axis_title)
     return fig
 
 
