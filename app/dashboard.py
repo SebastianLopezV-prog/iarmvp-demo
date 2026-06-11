@@ -500,12 +500,11 @@ def render_settings(kind: str):
     section("Controls")
     try:
         pfs = r_portfolios(kind)
-    except Exception as exc:  # noqa: BLE001 -- surface DB/import issues gracefully
-        st.error(f"Could not load portfolios from the database: {exc}")
+    except Exception:  # noqa: BLE001 -- show a clean message, not a stack trace
+        st.error("Data is currently unavailable. Please try again shortly.")
         st.stop()
     if pfs.empty:
-        st.warning("No portfolios found. Seed them with scripts/seed_demo.py and run "
-                   "scripts/run_iar.py --store.")
+        st.warning("No portfolios available yet.")
         st.stop()
 
     # Selections persist in the URL query params so the 60s auto-refresh (a full page
