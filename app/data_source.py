@@ -133,8 +133,8 @@ _EMPTY_CURVE = pd.DataFrame(columns=["vintage_ts", "iar_value", "ciar_value", "c
 def _limit_label(iar_type: str, limit_type: str) -> str:
     """Pretty label for the limit-status table, e.g. ``Period Gross — Day``."""
     type_names = {
-        "remaining_day": "Period {b} — Day",
-        "rolling_window": "Rolling {b} window",
+        "remaining_day": "Period {b} (day)",
+        "rolling_window": "Rolling {b} (4h)",
         "per_mtu": "Per-MTU {b} (peak)",
     }
     return type_names.get(limit_type, f"{{b}} {limit_type}").format(b=iar_type.capitalize())
