@@ -55,11 +55,13 @@ _CSS = f"""
   .volue-bar .meta {{ font-size: 0.85rem; opacity: 0.85; }}
   .kpi {{
       border: 1px solid #e7e7ea; border-top: 4px solid #ccc;
-      border-radius: 8px; padding: 14px 16px; background: #fff; height: 100%;
+      border-radius: 8px; padding: 12px 14px; background: #fff; height: 100%;
   }}
-  .kpi .lbl {{ font-size: 0.72rem; letter-spacing: 0.5px; color: #6b7280; text-transform: uppercase; }}
-  .kpi .val {{ font-size: 1.9rem; font-weight: 800; color: {INK}; line-height: 1.15; }}
-  .kpi .sub {{ font-size: 0.8rem; color: #6b7280; margin-top: 2px; }}
+  .kpi .lbl {{ font-size: 0.68rem; letter-spacing: 0.3px; color: #6b7280;
+               text-transform: uppercase; min-height: 2.4em; line-height: 1.2; }}
+  .kpi .val {{ font-size: 1.55rem; font-weight: 800; color: {INK}; line-height: 1.15;
+               white-space: nowrap; margin-top: 4px; }}
+  .kpi .sub {{ font-size: 0.78rem; color: #6b7280; margin-top: 4px; min-height: 2.4em; }}
   .chip {{ display: inline-block; padding: 2px 9px; border-radius: 999px;
            font-size: 0.74rem; font-weight: 600; margin-top: 8px; }}
   .feed {{ border-left: 3px solid #ccc; padding: 6px 10px; margin-bottom: 8px; background: #fafafa; }}
