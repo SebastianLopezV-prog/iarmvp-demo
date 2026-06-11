@@ -45,6 +45,7 @@ __all__ = [
     "get_limit_status",
     "get_limit_overview",
     "get_intraday",
+    "get_realised_intraday",
     "get_alerts",
     "get_backtest_summary",
 ]
