@@ -145,24 +145,11 @@ overlap. Without it, `run_iar.py` falls back to a synthetic stub portfolio.
 Engine sign convention: `cost = imbalance * price` (positive means cost, i.e. bad).
 IaR is the upper-tail quantile of the summed cost; CIaR is the mean beyond it.
 
-## Dashboard (demo UI)
+## Dashboard
 
-A Streamlit dashboard at `beginner UI/dashboard.py` visualises the tool. The Live IaR
-tab shows headline Gross/Spread IaR + CIaR (as P&L, where negative means loss), the
-scenario P&L distribution with mean/IaR/CIaR markers, the live spread fan chart, a
-data-source panel (which inputs are real vs stub), and the limit status against the
-configured euro-limits. The Backtest tab shows realised cost (3.1), backfilled
-day-ahead estimates (3.2), the exceedance and Kupiec calibration readout (3.3), and a
-button to calibrate sigma.
-
-```powershell
-.\venv\Scripts\python.exe -m streamlit run "beginner UI\dashboard.py"   # then open http://localhost:8501
-```
-
-It uses the same real inputs as `run_iar.py` (live spread; real DAM if the wheel is
-installed; real positions if a portfolio is loaded), falling back to stubs otherwise.
-The sigma slider shows how forecast-error size drives the risk. The UI reuses the
-backend modules only; no logic lives in the UI.
+The Streamlit dashboard (`app/dashboard.py`) is built in Week 4.1 on top of
+`service.py`, reading only through the service layer (no simulation or DB logic in the
+UI). An earlier throwaway demo UI was removed; the rebuilt version replaces it.
 
 ## Status
 
