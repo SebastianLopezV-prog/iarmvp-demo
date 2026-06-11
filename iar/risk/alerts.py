@@ -76,13 +76,35 @@ class LimitConfig:
         return float(value) if value is not None else None
 
 
+def _load_override() -> dict:
+    """User limit overrides ``{variant: {<limit_type>_eur: value}}`` (or empty)."""
+    if not LIMITS_OVERRIDE_PATH.exists():
+        return {}
+    try:
+        with LIMITS_OVERRIDE_PATH.open("r", encoding="utf-8") as fh:
+            return json.load(fh)
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
 def load_limits(path: str | Path = DEFAULT_LIMITS_PATH) -> LimitConfig:
-    """Load ``limits.toml`` into a :class:`LimitConfig` (stdlib ``tomllib``)."""
+    """Load ``limits.toml`` into a :class:`LimitConfig` (stdlib ``tomllib``).
+
+    Any user overrides in ``LIMITS_OVERRIDE_PATH`` (set from the dashboard) are merged
+    over the toml ``default`` block, so manually-set risk levels take effect across the
+    limit status, KPIs and alerts.
+    """
     p = Path(path)
     if not p.exists():
         raise FileNotFoundError(f"Limits config not found: {p}")
     with p.open("rb") as fh:
-        return LimitConfig(tomllib.load(fh))
+        data = tomllib.load(fh)
+    override = _load_override()
+    if override:
+        default = data.setdefault("default", {})
+        for variant, vals in override.items():
+            default.setdefault(variant, {}).update(vals)
+    return LimitConfig(data)
 
 
 # --------------------------------------------------------------------------- #
