@@ -154,6 +154,11 @@ class ServiceDataSource(DataSource):
             return None
         limits = self._svc.get_limit_status(portfolio_id)  # remaining_day, gross+spread
         by_type = {row["iar_type"]: row for _, row in limits.iterrows()}
+        intra = self._svc.get_intraday(portfolio_id)
+        peak = {
+            "gross": float(intra["gross_iar"].max()) if not intra.empty else None,
+            "spread": float(intra["spread_iar"].max()) if not intra.empty else None,
+        }
 
         def _basis(name: str) -> dict:
             pair = latest.get(name) or {}
@@ -161,13 +166,20 @@ class ServiceDataSource(DataSource):
             return {
                 "period_iar": pair.get("iar"),
                 "ciar": pair.get("ciar"),
-                "peak_mtu_iar": None,  # engine emits no per-MTU IaR series (MVP)
+                "peak_mtu_iar": peak[name],
                 "limit": (None if lim is None else lim["limit_value"]),
                 "utilisation": (None if lim is None else lim["utilisation"]),
                 "severity": (None if lim is None else lim["severity"]),
             }
 
-        sev = limits["severity"] if not limits.empty else pd.Series(dtype=object)
+        # Overperformance = diversified period IaR ÷ naive Σ(per-MTU IaR) (< 1 ⇒ benefit).
+        overperf = None
+        if not intra.empty and latest.get("gross"):
+            mtu_sum = float(intra["gross_iar"].sum())
+            if mtu_sum:
+                overperf = round(latest["gross"]["iar"] / mtu_sum, 2)
+
+        sev = self.limit_status(portfolio_id)["severity"]
         return {
             "confidence": latest.get("confidence"),
             "vintage_ts": latest.get("vintage_ts"),
@@ -176,21 +188,48 @@ class ServiceDataSource(DataSource):
             "horizon": latest.get("horizon"),
             "gross": _basis("gross"),
             "spread": _basis("spread"),
-            "overperformance_ratio": None,
+            "overperformance_ratio": overperf,
             "n_warnings": int((sev == "soft").sum()),
             "n_breaches": int((sev == "hard").sum()),
         }
 
-    # -- per-MTU panels: not emitted by the MVP engine --------------------- #
+    # -- per-MTU panels (now real, from the stored per-MTU read-off) ------- #
     def intraday(self, portfolio_id: int, *, basis: str = "gross") -> pd.DataFrame:
-        return _EMPTY_INTRADAY.copy()
+        raw = self._svc.get_intraday(portfolio_id)
+        if raw.empty:
+            return _EMPTY_INTRADAY.copy()
+        # Per-MTU limit for this basis (peak limit), for the chart's limit line.
+        overview = self._svc.get_limit_overview(portfolio_id)
+        mtu_limit = float("nan")
+        if not overview.empty:
+            row = overview[(overview["iar_type"] == basis) & (overview["limit_type"] == "per_mtu")]
+            if not row.empty:
+                mtu_limit = float(row["limit_value"].iloc[0])
+        now = pd.Timestamp.now(tz="UTC")
+        ts = raw["timestamp"]
+        return pd.DataFrame(
+            {
+                "timestamp": ts,
+                "forecast_iar": raw[f"{basis}_iar"],
+                "realised_iar": pd.NA,  # realised per-MTU cost needs actuals (not yet settled)
+                "position_mwh": raw["position_mwh"],
+                "mtu_limit": mtu_limit,
+                "is_past": ts < now,
+            }
+        )
 
     def heatmap(self, portfolio_id: int, *, basis: str = "gross") -> pd.DataFrame:
-        return _EMPTY_HEATMAP.copy()
+        raw = self._svc.get_intraday(portfolio_id)
+        if raw.empty:
+            return _EMPTY_HEATMAP.copy()
+        ts = pd.to_datetime(raw["timestamp"])
+        return pd.DataFrame(
+            {"hour": ts.dt.hour, "quarter": ts.dt.minute, "iar": raw[f"{basis}_iar"]}
+        )
 
-    # -- limits ------------------------------------------------------------ #
+    # -- limits (all types: day / rolling / per-MTU) ----------------------- #
     def limit_status(self, portfolio_id: int) -> pd.DataFrame:
-        raw = self._svc.get_limit_status(portfolio_id)
+        raw = self._svc.get_limit_overview(portfolio_id)
         if raw.empty:
             return _EMPTY_LIMITS.copy()
         return pd.DataFrame(
