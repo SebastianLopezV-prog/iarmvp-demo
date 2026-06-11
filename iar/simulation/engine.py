@@ -285,14 +285,23 @@ def run_simulation(
     #                                             not Spread, depends on dam_price.
     # Consequence: Spread IaR's price side is fully live (the spread); Gross additionally
     # needs a real spot-price feed (currently a stub — see load_dam_prices TODO(dam-source)).
-    # Summed-across-MTU cost per scenario (the period total), then read risk off.
-    cost_gross = (imbalance * absolute_price).sum(axis=1)
-    cost_spread = (imbalance * spread).sum(axis=1)
+    # Per-(scenario, MTU) cost matrices; sum across MTUs for the period total.
+    cost_gross_mtu = imbalance * absolute_price
+    cost_spread_mtu = imbalance * spread
+    gross = _measure(cost_gross_mtu.sum(axis=1), config.confidence)
+    spread = _measure(cost_spread_mtu.sum(axis=1), config.confidence)
+
+    # Per-MTU and rolling-window read-offs of the same scenario set (for the
+    # intraday / heatmap / per-MTU & rolling limit panels).
+    for measure, cost_mtu in ((gross, cost_gross_mtu), (spread, cost_spread_mtu)):
+        measure.iar_per_mtu, measure.ciar_per_mtu = _per_mtu_measures(cost_mtu, config.confidence)
+        measure.rolling_iar = _rolling_iar(cost_mtu, config.confidence, config.rolling_window_mtus)
+        measure.rolling_window = min(config.rolling_window_mtus, n_mtus)
 
     return IaRReport(
         confidence=config.confidence,
         n_scenarios=config.n_scenarios,
         seed=config.seed,
-        gross=_measure(cost_gross, config.confidence),
-        spread=_measure(cost_spread, config.confidence),
+        gross=gross,
+        spread=spread,
     )
