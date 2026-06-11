@@ -87,6 +87,7 @@ def persist_report(
         n_scenarios=report.n_scenarios,
         seed=report.seed,
         config_json=json.dumps(config, default=str),
+        per_mtu_json=json.dumps(per_mtu, default=str) if per_mtu is not None else None,
     )
     session.add(run)
     session.flush()  # assign run.run_id before creating child rows
