@@ -119,8 +119,8 @@ _CSS = f"""
   .u-hero {{ background: linear-gradient(100deg, #ffffff, #fff6f2); border: 1px solid #ffd9cc;
              border-left: 4px solid {VOLUE_ORANGE}; border-radius: 14px; padding: 16px 20px;
              margin: 4px 0 6px; box-shadow: 0 2px 10px rgba(20,24,33,.05); }}
-  .u-hero .lead {{ font-size: 0.98rem; color: {INK}; line-height: 1.5; }}
-  .u-hero .sub {{ font-size: 0.84rem; color: {MUTED}; margin-top: 6px; }}
+  .u-hero .lead {{ font-size: 1.06rem; color: {INK}; line-height: 1.55; }}
+  .u-hero .sub {{ font-size: 0.92rem; color: {MUTED}; margin-top: 6px; }}
   .u-card {{ border: 1px solid #ebedf0; border-radius: 12px; padding: 13px 15px; background: #fff;
              height: 100%; box-shadow: 0 2px 10px rgba(20,24,33,.05); }}
   .u-card .term {{ font-weight: 800; color: {INK}; font-size: 0.95rem; }}
