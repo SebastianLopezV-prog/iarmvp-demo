@@ -204,7 +204,12 @@ def main() -> None:
     if args.store:
         init_db()
         with get_session() as s:
-            pf = get_or_create_portfolio(s, "MC Runner", f"{args.area} Wind", args.area)
+            # Store the run on the SAME portfolio whose positions it used (real data);
+            # only fall back to a synthetic "MC Runner" portfolio when running on the stub.
+            if pf_id is not None:
+                pf = s.get(Portfolio, pf_id)
+            else:
+                pf = get_or_create_portfolio(s, "MC Runner", f"{args.area} Wind", args.area)
             v = datetime.fromisoformat(vintage) if vintage else datetime.now(timezone.utc)
             run = persist_report(
                 s, rep, pf.portfolio_id, vintage_ts=v, horizon=f"{n_mtus}xPT15M",
