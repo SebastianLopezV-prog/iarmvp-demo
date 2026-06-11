@@ -120,16 +120,31 @@ class RiskMeasure:
 
     ``cost`` is the per-scenario summed cost vector — a diagnostic kept for
     plotting/validation; it is *not* persisted (architecture: store summaries).
+
+    The ``*_per_mtu`` arrays and ``rolling_iar`` are per-MTU / rolling-window
+    read-offs of the same scenario set (length ``n_mtus`` / scalar). They power the
+    dashboard's intraday, heatmap and per-MTU/rolling limit panels. They are
+    *read-offs*, not raw scenarios, so persisting them still honours the
+    "store summaries" rule.
     """
 
     iar: float
     ciar: float
     mean: float
     cost: np.ndarray
+    iar_per_mtu: np.ndarray | None = None
+    ciar_per_mtu: np.ndarray | None = None
+    rolling_iar: float | None = None
+    rolling_window: int | None = None
 
     def summary(self) -> dict[str, float]:
         """Numbers only (no scenario vector) — what gets persisted in 2.4."""
         return {"iar": self.iar, "ciar": self.ciar, "mean": self.mean}
+
+    @property
+    def peak_mtu_iar(self) -> float | None:
+        """The worst single-MTU IaR (max of the per-MTU series), or ``None``."""
+        return None if self.iar_per_mtu is None else float(np.max(self.iar_per_mtu))
 
 
 @dataclass
