@@ -50,11 +50,55 @@ __all__ = [
     "get_iar_curve",
     "get_limit_status",
     "get_limit_overview",
+    "get_limit_settings",
+    "save_limit_settings",
+    "reset_limit_settings",
     "get_intraday",
     "get_realised_intraday",
     "get_alerts",
     "get_backtest_summary",
 ]
+
+_LIMIT_TYPES = ("remaining_day", "rolling_window", "per_mtu")
+
+
+def get_limit_settings() -> dict:
+    """Effective euro limits as ``{variant: {limit_type: value}}``.
+
+    Merges the configured defaults with any user override (see :func:`save_limit_settings`),
+    for ``gross``/``spread`` and the day / rolling-window / per-MTU limit types. Used to
+    pre-fill the dashboard's risk-limit editor.
+    """
+    cfg = load_limits()
+    out: dict = {}
+    for variant in ("gross", "spread"):
+        out[variant] = {}
+        for limit_type in _LIMIT_TYPES:
+            v = cfg.limit_for("", variant, limit_type)
+            out[variant][limit_type] = float(v) if v is not None else 0.0
+    return out
+
+
+def save_limit_settings(values: dict) -> None:
+    """Persist user limit overrides. ``values`` is ``{variant: {limit_type: eur}}``.
+
+    Written to ``LIMITS_OVERRIDE_PATH`` and merged over the defaults by
+    :func:`iar.risk.alerts.load_limits`, so the new levels apply to the limit status,
+    the KPI utilisation, and the alert evaluation.
+    """
+    override = {
+        variant: {f"{lt}_eur": float(x) for lt, x in lts.items()}
+        for variant, lts in values.items()
+    }
+    LIMITS_OVERRIDE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with LIMITS_OVERRIDE_PATH.open("w", encoding="utf-8") as fh:
+        json.dump(override, fh, indent=2)
+
+
+def reset_limit_settings() -> None:
+    """Remove any user override and revert to the configured default limits."""
+    if LIMITS_OVERRIDE_PATH.exists():
+        LIMITS_OVERRIDE_PATH.unlink()
 
 
 def _latest_run(s: Session, portfolio_id: int) -> SimulationRun | None:
