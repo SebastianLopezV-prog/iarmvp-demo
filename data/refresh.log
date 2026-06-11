@@ -1695,3 +1695,90 @@ Per-MTU head (positive = cost):
 2026-05-11 15:30:00+00:00         0.2923                  122.10   35.689830    -0.011692
 ================================================================
 Sign convention: imbalance = DAM position - actual delivery; positive cost = bad. Feeds the 3.3 backtest (iar.risk.backtest.run_backtest).
+================================================================
+IaR backtest (3.3) | area=NO2 portfolio='NO2 Wind' (#2)
+================================================================
+----------------------------------------------------------------
+basis: GROSS  (confidence 95%)
+    period iar_estimate realised_cost exceeded
+2026-05-12        5,856         1,546   within
+2026-05-13        3,574        -1,193   within
+2026-05-14        8,110         4,508   within
+2026-05-15        4,106          -595   within
+2026-05-16        5,962         2,284   within
+2026-05-17        6,997         2,417   within
+2026-05-18        5,453           241   within
+2026-05-19        8,308         3,990   within
+2026-05-20        2,353        -2,179   within
+2026-05-21        3,593          -866   within
+2026-05-22        5,663         1,788   within
+2026-05-23        2,795          -716   within
+2026-05-24        3,101          -413   within
+2026-05-25        4,727           897   within
+2026-05-26        2,848          -812   within
+2026-05-27        4,988         1,329   within
+2026-05-28        2,413        -1,507   within
+2026-05-29        4,346           559   within
+2026-05-30        5,364         1,436   within
+2026-05-31        3,136          -818   within
+2026-06-01        4,572          -360   within
+2026-06-02        4,666           117   within
+2026-06-03        5,735         1,447   within
+2026-06-04        3,011            60   within
+2026-06-05        1,596        -2,195   within
+2026-06-06        4,575           821   within
+2026-06-07        4,434         1,192   within
+2026-06-08       -1,551        -6,418   within
+2026-06-09        5,902         1,658   within
+2026-06-10        3,281          -859   within
+2026-06-11        5,020        -1,928   within
+----------------------------------------------------------------
+exceedances    : 0 / 31  (observed 0%, expected ~5%)
+Kupiec POF     : LR=3.180  p-value=0.075  ->  CALIBRATED (alpha=5%)
+records        : persisted
+----------------------------------------------------------------
+basis: SPREAD  (confidence 95%)
+    period iar_estimate realised_cost exceeded
+2026-05-12          655           129   within
+2026-05-13          839            19   within
+2026-05-14          563           557   within
+2026-05-15          713           -35   within
+2026-05-16          664           250   within
+2026-05-17        1,120          -191   within
+2026-05-18          994           -16   within
+2026-05-19          551           -41   within
+2026-05-20        1,009           -53   within
+2026-05-21        1,099            -3   within
+2026-05-22          762             8   within
+2026-05-23        1,000             3   within
+2026-05-24        1,062            23   within
+2026-05-25        1,084           -26   within
+2026-05-26          835            77   within
+2026-05-27          752          -252   within
+2026-05-28          878           -89   within
+2026-05-29          930            -1   within
+2026-05-30          579          -158   within
+2026-05-31          677             8   within
+2026-06-01          620            38   within
+2026-06-02          930           -11   within
+2026-06-03          807          -158   within
+2026-06-04          960             7   within
+2026-06-05          977           183   within
+2026-06-06        1,040           -28   within
+2026-06-07        1,338           -37   within
+2026-06-08        1,560           182   within
+2026-06-09          697          -251   within
+2026-06-10          934           122   within
+2026-06-11          630           -35   within
+----------------------------------------------------------------
+exceedances    : 0 / 31  (observed 0%, expected ~5%)
+Kupiec POF     : LR=3.180  p-value=0.075  ->  CALIBRATED (alpha=5%)
+records        : NOT persisted (only the first basis persists with --basis both)
+================================================================
+stored -> C:\Users\sebastian.lopez\OneDrive - Volue AS\Documents\Code\IAR MVP\data\iar.db  (read back via iar.risk.backtest.load_performance_records)
+note: with --basis both, only GROSS records were persisted (HistoricalPerformanceRecord has no basis column).
+[refresh] 2026-06-11T14:15:02.483640+00:00  mode=fast  areas=['NO2']
+--- NO2: live IaR ---
+--- NO2: realised prices ---
+--- NO2: backtest ---
+[refresh] done in 96s; pruned 1 stale live run(s).

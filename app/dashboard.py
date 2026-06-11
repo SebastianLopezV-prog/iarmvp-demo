@@ -537,6 +537,93 @@ def render_curve(df: pd.DataFrame, ov: dict | None, basis: str) -> None:
     st.plotly_chart(fig, use_container_width=True)
 
 
+def render_analytics_kpis(ov: dict, basis: str) -> None:
+    """Risk-character summary for the selected basis: level, tail, peak, diversification."""
+    b = ov[basis]
+    iar, ciar, peak = b["period_iar"], b["ciar"], b["peak_mtu_iar"]
+    conf = ov.get("confidence")
+    conf_txt = pct(conf) if conf is not None else "selected"
+    tail = (ciar / iar) if (iar and ciar and iar != 0) else None
+    div = ov.get("overperformance_ratio")
+    cards = [
+        kpi_card(f"Period {basis} IaR, remaining day", eur(iar),
+                 f"{conf_txt} confidence &middot; {pct(b['utilisation'])} of limit", b["severity"]),
+        kpi_card("Expected shortfall (CIaR)", eur(ciar),
+                 f"Tail ratio {tail:.2f}x IaR" if tail else "Average loss beyond IaR",
+                 show_chip=False),
+        kpi_card(f"Peak MTU {basis} IaR",
+                 eur(peak) if peak is not None else "n/a",
+                 "Worst single 15-min MTU", show_chip=False),
+        kpi_card("Diversification ratio", f"{div:.2f}" if div is not None else "n/a",
+                 "Period IaR vs naive sum of MTU IaRs", show_chip=False),
+    ]
+    for col, html in zip(st.columns(4), cards):
+        col.markdown(html, unsafe_allow_html=True)
+
+
+def render_gross_spread(df: pd.DataFrame) -> None:
+    """Grouped bars: current Gross vs Spread IaR for each horizon (day / rolling / per-MTU)."""
+    section("Gross vs Spread exposure by horizon")
+    if df.empty:
+        st.info("No limits evaluated for the latest run yet.")
+        return
+    st.caption("Current IaR at each horizon. Gross is the total settlement cost; Spread is the "
+               "cost relative to the day-ahead position. Gross sits above Spread when day-ahead "
+               "revenue offsets part of the exposure.")
+    order = ["remaining_day", "rolling_window", "per_mtu"]
+    names = {"remaining_day": "Period (day)", "rolling_window": "Rolling (4h)", "per_mtu": "Per-MTU (peak)"}
+    piv: dict[str, dict[str, float]] = {}
+    for _, r in df.iterrows():
+        piv.setdefault(r["limit_type"], {})[r["iar_type"]] = r["current_iar"]
+    cats = [names[t] for t in order if t in piv]
+    gross = [piv[t].get("gross") for t in order if t in piv]
+    spread = [piv[t].get("spread") for t in order if t in piv]
+    fig = go.Figure()
+    fig.add_bar(x=cats, y=gross, name="Gross", marker_color=VOLUE_ORANGE, marker_line_width=0)
+    fig.add_bar(x=cats, y=spread, name="Spread", marker_color=TEAL, marker_line_width=0)
+    _style_fig(fig)
+    fig.update_layout(height=320, barmode="group", bargap=0.3)
+    fig.update_yaxes(title_text="IaR (EUR)")
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def render_concentration(df: pd.DataFrame, basis: str) -> None:
+    """Cumulative-share (Lorenz-style) curve of per-MTU IaR: how concentrated period risk is."""
+    section("Risk concentration across MTUs")
+    sub = df[df["forecast_iar"].notna()] if not df.empty else df
+    if sub.empty or len(sub) < 2:
+        st.info("No per-MTU IaR series for the latest run yet.")
+        return
+    vals = np.sort(sub["forecast_iar"].to_numpy(dtype=float))[::-1]
+    total = float(vals.sum())
+    if total <= 0:
+        st.info("Per-MTU IaR series is empty for this run.")
+        return
+    n = len(vals)
+    cum = np.cumsum(vals) / total * 100.0
+    x = np.arange(1, n + 1) / n * 100.0
+    top_n = max(1, int(round(n * 0.10)))
+    top_share = float(cum[top_n - 1])
+    st.caption(
+        f"Share of total forecast {basis} IaR contributed by the worst MTUs, ranked. The most "
+        f"severe {top_n} MTUs ({top_n / n:.0%} of the horizon) account for {top_share:.0f}% of "
+        "summed risk. The further the curve sits above the diagonal, the more risk concentrates "
+        "in a few windows, which is where hedging pays off most."
+    )
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=np.concatenate([[0.0], x]), y=np.concatenate([[0.0], cum]), name="Cumulative IaR",
+        mode="lines", line=dict(color=VOLUE_ORANGE, width=2.5), fill="tozeroy",
+        fillcolor="rgba(255,92,57,0.08)"))
+    fig.add_trace(go.Scatter(x=[0, 100], y=[0, 100], name="Even spread", mode="lines",
+                             line=dict(color="#9aa0a6", width=1.3, dash="dot")))
+    _style_fig(fig)
+    fig.update_layout(height=320)
+    fig.update_xaxes(title_text="Share of MTUs (worst first), %")
+    fig.update_yaxes(title_text="Cumulative share of IaR, %")
+    st.plotly_chart(fig, use_container_width=True)
+
+
 def render_backtest(bt: dict, basis: str) -> None:
     section(f"Backtest: {basis.capitalize()} IaR versus realised cost")
     periods = bt.get("periods", pd.DataFrame())
