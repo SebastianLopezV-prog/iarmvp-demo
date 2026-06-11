@@ -604,6 +604,8 @@ def main() -> None:
     with header_box:
         @st.fragment(run_every=AUTO_REFRESH_SECONDS)
         def _header() -> None:
+            # Brief on-screen notice each time the live view re-reads the database.
+            st.toast("Refreshing live data...")
             render_header(pf, r_overview(kind, pid, confidence), kind)
         _header()
 
