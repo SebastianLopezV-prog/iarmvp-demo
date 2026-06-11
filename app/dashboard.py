@@ -522,6 +522,144 @@ def render_backtest(bt: dict, basis: str) -> None:
         st.dataframe(periods, use_container_width=True, hide_index=True)
 
 
+_USAGE_MD = """
+### What this tool measures
+
+Imbalance at Risk (IaR) quantifies the worst-case cost of a wind portfolio's
+imbalance over a forward horizon, at a stated confidence level. A portfolio sells
+volume on the day-ahead market. Actual generation differs from that sold position,
+and the difference, the imbalance, settles at the transmission system operator's
+imbalance price. IaR expresses that exposure as a single figure: at 95% confidence,
+the imbalance cost over the horizon is not expected to exceed this amount. It is the
+electricity-balancing analogue of Value at Risk in finance.
+
+The sign convention throughout is that a positive figure is a cost (unfavourable)
+and a negative figure is revenue (favourable).
+
+### Core definitions
+
+**Imbalance.** For each 15-minute settlement period (MTU), imbalance equals the
+day-ahead position minus actual delivery. A positive imbalance means the portfolio
+is short (it delivered less than it sold); a negative imbalance means it is long.
+
+**Gross IaR.** The worst-case total settlement cost: imbalance multiplied by the
+absolute imbalance price, summed across the horizon. This is the full cash exposure
+on the imbalance position.
+
+**Spread IaR.** The worst-case underperformance relative to the day-ahead outcome:
+imbalance multiplied by the difference between the imbalance price and the day-ahead
+price. This isolates the cost attributable to imbalance settlement, separate from the
+price level the portfolio had already locked in.
+
+**CIaR (Conditional IaR, also called Expected Shortfall).** The average cost across
+the scenarios that exceed the IaR threshold. Where IaR marks the edge of the worst
+tail, CIaR describes how severe those tail outcomes are on average. CIaR is always at
+least as large as IaR.
+
+**Period IaR (summed-quantile).** The IaR for a horizon is the quantile of the cost
+summed across all MTUs in that horizon. The sum is taken first, per scenario, and the
+quantile second. It is not the sum of the individual per-MTU IaR figures. Summing
+per-MTU worst cases would assume every period reaches its worst outcome at the same
+time, which overstates the true risk.
+
+**Overperformance ratio.** The period IaR divided by the naive sum of the per-MTU IaR
+figures. A value below 1 measures the diversification benefit across periods: the
+portfolio's worst day is less severe than the sum of its worst individual periods,
+because those periods do not all go wrong together. A lower value indicates greater
+diversification.
+
+**Peak MTU IaR.** The largest single-MTU IaR across the horizon. It identifies the
+most exposed 15-minute period.
+
+### How the figures are calculated (Monte Carlo)
+
+The figures are produced by a Monte Carlo simulation rather than a closed-form
+formula. Each run proceeds as follows:
+
+1. Draw 10,000 scenarios. For each scenario and each MTU, sample an imbalance price
+   spread and an imbalance volume.
+2. The price spread is sampled by inverse-CDF from the Optimeering quantile curve,
+   which preserves the forecast tails rather than refitting to a normal distribution.
+   The imbalance volume is sampled from a parametric distribution centred on the
+   expected imbalance (day-ahead position minus forecast generation).
+3. Price and volume are sampled independently. This is a deliberate simplification for
+   this version; no dependence between price and volume is modelled.
+4. For each scenario, the settlement cost per MTU is computed and summed across the
+   horizon.
+5. The risk measures are read off the resulting distribution of summed cost: IaR is
+   the upper-tail quantile at the chosen confidence, and CIaR is the mean beyond it.
+
+Each scheduled refresh runs this simulation again, with the latest inputs, for every
+portfolio.
+
+### Inputs and data sources
+
+- **Imbalance price spread:** live forecast from Optimeering, supplied as a quantile
+  curve per MTU.
+- **Day-ahead (spot) price:** the cleared market price, required to convert the spread
+  into an absolute price for Gross IaR.
+- **Positions and generation:** the portfolio's day-ahead position and forecast
+  generation.
+- **Imbalance-volume uncertainty (sigma):** modelled parametrically as a fraction of
+  capacity, because no historical forecast-error record is available yet. This is the
+  single calibrated assumption in the chain; the remaining inputs are observed data.
+
+### Reading each panel
+
+**KPI cards.** Period Gross IaR and Period Spread IaR for the remaining day, each shown
+against its configured limit and utilisation. Peak MTU Gross IaR is the most exposed
+single period. Overperformance ratio is the diversification benefit defined above.
+
+**Intraday IaR.** A per-MTU view across the day in Norwegian time. Bars show forecast
+IaR for forward periods; the line shows the portfolio position on the right axis; the
+dashed line is the per-MTU limit.
+
+**Forecast IaR heatmap.** The 95th-percentile worst-case cost for each 15-minute
+period, projected from now up to 24 hours ahead. Colour intensity indicates magnitude.
+The dotted divider marks the start of the next day. Because this is a risk bound, the
+values are larger than a typical outcome.
+
+**Realised cost heatmap.** The actual settled cost for each period that has already
+cleared, on its own diverging scale: blue for net revenue, red for net cost. This is a
+single realised outcome, not a worst case, so it is shown on a separate scale and is
+not directly comparable to the forecast heatmap.
+
+**Limit status.** Current IaR against the configured euro limits, by limit type (period,
+rolling window, per-MTU) and basis (gross, spread), with utilisation and a status
+indicator. Limits are a risk-appetite setting held in configuration, not a figure the
+tool derives.
+
+**Alert feed.** Limit breaches and warnings raised against the most recent run.
+
+**IaR over time (Risk Analytics).** The IaR estimate for each stored run, plotted
+against the limit line, showing how the figure has moved across successive runs.
+
+**Backtest (Historical).** Each settled period's realised cost compared against the IaR
+estimate that applied to it. An exceedance is a period whose realised cost was worse
+than its estimate. The Kupiec proportion-of-failures test checks whether the observed
+exceedance rate is consistent with the confidence level: at 95% confidence, roughly 5%
+of periods are expected to exceed. The test has low statistical power over short
+windows, so it is a calibration indicator rather than a verdict.
+
+### Confidence level
+
+Confidence (for example 95%) sets how far into the tail the IaR is read. Higher
+confidence produces a larger, more conservative figure. Stored runs are computed at a
+fixed confidence; the selector drives the backtest target and the display.
+
+### Refresh
+
+The view re-reads the database every two minutes and shows a brief notice when it does.
+The underlying figures are regenerated by the scheduled pipeline, which runs the full
+simulation for each portfolio at a fixed interval.
+"""
+
+
+def render_usage() -> None:
+    section("Usage and methodology")
+    st.markdown(_USAGE_MD)
+
+
 # --------------------------------------------------------------------------- #
 # Main
 # --------------------------------------------------------------------------- #
