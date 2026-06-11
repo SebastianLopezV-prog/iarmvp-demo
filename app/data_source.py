@@ -323,7 +323,7 @@ class ServiceDataSource(DataSource):
             rows.append(
                 {
                     "ts": _to_local(a["breach_ts"]),
-                    "title": f"{verb} — {str(a['iar_type']).capitalize()} {a['limit_type']}",
+                    "title": f"{verb}: {str(a['iar_type']).capitalize()} {a['limit_type']}",
                     "body": (
                         f"IaR €{a['iar_value']:,.0f} vs limit €{a['limit_value']:,.0f}"
                         if pd.notna(a["iar_value"]) else f"Limit €{a['limit_value']:,.0f}"
