@@ -890,12 +890,16 @@ def render_settings(kind: str):
         return qp.get(key, default)
 
     labels = [f"{r['price_area']} - {r['name']}" for _, r in pfs.iterrows()]
-    try:
-        idx_default = min(max(int(_qp("pf", 0)), 0), len(labels) - 1)
-    except ValueError:
-        idx_default = 0
-    idx = st.selectbox("Portfolio", range(len(labels)), index=idx_default,
-                       format_func=lambda i: labels[i])
+    if len(labels) == 1:
+        idx = 0
+        st.markdown(f"**Portfolio:** {labels[0]}")
+    else:
+        try:
+            idx_default = min(max(int(_qp("pf", 0)), 0), len(labels) - 1)
+        except ValueError:
+            idx_default = 0
+        idx = st.selectbox("Portfolio", range(len(labels)), index=idx_default,
+                           format_func=lambda i: labels[i])
     pf = pfs.iloc[idx].to_dict()
 
     basis_opts = ["gross", "spread"]
