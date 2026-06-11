@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Type
 
 import pandas as pd
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session
 
 from iar.db.models import (
