@@ -54,6 +54,11 @@ def persist_report(
         When the run was executed; defaults to now (UTC).
     extra_config:
         Optional extra key/values to fold into the stored ``config_json``.
+    per_mtu:
+        Optional per-MTU IaR detail (timestamps, per-MTU gross/spread IaR series,
+        peak/rolling scalars, positions) serialised to ``SimulationRun.per_mtu_json``
+        for the dashboard's intraday/heatmap/per-MTU panels. Numbers only — still a
+        read-off, not raw scenarios.
 
     Returns
     -------
