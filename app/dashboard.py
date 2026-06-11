@@ -773,18 +773,21 @@ def _iar_illustration() -> go.Figure:
     return fig
 
 
-def _feat_card(term: str, icon_key: str, body: str) -> str:
-    return (f"<div class='feat'><div class='rule'></div>"
-            f"<div class='ic'>{_icon(icon_key)}</div>"
+def _feat_card(term: str, icon_key: str, body: str, colour: str) -> str:
+    return (f"<div class='feat'>"
+            f"<div class='rule' style='border-top-color:{colour}'></div>"
+            f"<div class='ic' style='background:{colour}1A;color:{colour}'>{_icon(icon_key)}</div>"
             f"<div class='h'>{term}</div><div class='p'>{body}</div></div>")
 
 
 def _feat_grid(items, cols: int = 3) -> None:
-    """Render feature cards in aligned rows (a fresh column set per row keeps tops level)."""
+    """Render feature cards in aligned rows (a fresh column set per row keeps tops level),
+    cycling the accent palette so each card has its own colour."""
     for start in range(0, len(items), cols):
         columns = st.columns(cols, gap="large")
-        for col, (term, icon_key, body) in zip(columns, items[start:start + cols]):
-            col.markdown(_feat_card(term, icon_key, body), unsafe_allow_html=True)
+        for j, (col, (term, icon_key, body)) in enumerate(zip(columns, items[start:start + cols])):
+            colour = FEAT_PALETTE[(start + j) % len(FEAT_PALETTE)]
+            col.markdown(_feat_card(term, icon_key, body, colour), unsafe_allow_html=True)
 
 
 def render_usage() -> None:
