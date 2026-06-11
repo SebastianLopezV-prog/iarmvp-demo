@@ -283,24 +283,33 @@ class DemoDataSource(DataSource):
         return np.random.default_rng(1000 + portfolio_id)
 
     @staticmethod
+    def _factor(portfolio_id: int) -> float:
+        """Stable per-portfolio multiplier (≈0.85–1.15) so areas differ but stay near target."""
+        return float(0.85 + 0.30 * np.random.default_rng(500 + portfolio_id).random())
+
+    @staticmethod
     def _conf_scale(confidence: float) -> float:
         """Heavier confidence ⇒ a larger worst-case figure (rough z-ratio vs P95)."""
         from scipy.stats import norm
 
         return float(norm.ppf(confidence) / norm.ppf(0.95))
 
-    def _mtu_profile(self, portfolio_id: int, basis: str, confidence: float):
-        """Per-MTU forecast IaR + position for a day, peaking in the afternoon."""
+    def _current(self, portfolio_id: int, basis: str, limit_type: str, confidence: float) -> float:
+        """Anchored 'current' IaR for a (basis, limit_type) — target × portfolio × confidence."""
+        target = _DEMO_TARGETS[basis][limit_type]
+        return target * self._factor(portfolio_id) * self._conf_scale(confidence)
+
+    def _mtu_series(self, portfolio_id: int, basis: str, confidence: float):
+        """Per-MTU forecast IaR + position for a day; peak ≈ the per-MTU target."""
         rng = self._rng(portfolio_id + (0 if basis == "gross" else 50))
         n = MTUS_PER_DAY
         hours = np.arange(n) * (MTU_MINUTES / 60.0)
-        # Afternoon-peaking risk shape (evening wind ramp + price volatility).
-        shape = 0.45 + 0.55 * np.exp(-((hours - 15.5) ** 2) / (2 * 3.2 ** 2))
-        base_peak = (2_140 if basis == "gross" else 880) * self._conf_scale(confidence)
-        noise = rng.normal(1.0, 0.10, n).clip(0.6, 1.5)
-        forecast = base_peak * shape * noise
-        # Net-short wind position (MWh per MTU), mildly time-varying.
-        position = -(18 + 10 * shape + rng.normal(0, 2, n))
+        # Afternoon-peaking risk shape (evening wind ramp + price volatility), max ≈ 1.
+        shape = 0.32 + 0.68 * np.exp(-((hours - 15.5) ** 2) / (2 * 3.2 ** 2))
+        peak = self._current(portfolio_id, basis, "per_mtu", confidence)
+        noise = rng.normal(1.0, 0.04, n).clip(0.85, 1.0)  # keep the series max ≈ peak
+        forecast = peak * shape * noise
+        position = -(18 + 10 * shape + rng.normal(0, 2, n))  # net-short wind, MWh/MTU
         return forecast, position
 
     # -- portfolios -------------------------------------------------------- #
