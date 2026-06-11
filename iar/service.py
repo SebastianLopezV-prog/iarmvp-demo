@@ -35,6 +35,7 @@ from iar.db.models import IaRResult, Portfolio, SimulationRun
 from iar.db.session import get_session, init_db
 from iar.risk.alerts import check_run, classify_severity, load_alerts, load_limits
 from iar.risk.backtest import run_backtest
+from iar.risk.realised_cost import compute_realised_cost
 
 __all__ = [
     "list_portfolios",
