@@ -421,8 +421,8 @@ def _rounded_heatmap(z, *, row_labels, col_labels, col_hovers, colorscale, color
     axis_tick = dict(size=13, color="#2b3038")
     axis_title = dict(size=12.5, color="#4b5563")
     fig.update_layout(
-        height=240, margin=dict(l=12, r=12, t=24, b=10),
-        font=dict(family=FONT, size=12, color="#374151"),
+        height=300, margin=dict(l=12, r=12, t=26, b=10),
+        font=dict(family=FONT, size=13, color="#374151"),
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
     )
     fig.update_xaxes(range=[-0.2, ncols + 0.2], tickvals=[i + 0.5 for i in range(ncols)],
