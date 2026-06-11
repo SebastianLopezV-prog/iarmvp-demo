@@ -108,6 +108,33 @@ _CSS = f"""
   .stTabs [data-baseweb="tab"] {{ font-weight: 600; color: #2b3038; }}
   .stTabs [data-baseweb="tab"] p {{ color: #2b3038 !important; }}
   .stTabs [aria-selected="true"] p {{ color: {VOLUE_ORANGE} !important; }}
+
+  /* ---- Usage tab ---- */
+  .u-hero {{ background: linear-gradient(100deg, #ffffff, #fff6f2); border: 1px solid #ffd9cc;
+             border-left: 4px solid {VOLUE_ORANGE}; border-radius: 14px; padding: 16px 20px;
+             margin: 4px 0 6px; box-shadow: 0 2px 10px rgba(20,24,33,.05); }}
+  .u-hero .lead {{ font-size: 0.98rem; color: {INK}; line-height: 1.5; }}
+  .u-hero .sub {{ font-size: 0.84rem; color: {MUTED}; margin-top: 6px; }}
+  .u-card {{ border: 1px solid #ebedf0; border-radius: 12px; padding: 13px 15px; background: #fff;
+             height: 100%; box-shadow: 0 2px 10px rgba(20,24,33,.05); }}
+  .u-card .term {{ font-weight: 800; color: {INK}; font-size: 0.95rem; }}
+  .u-card .body {{ font-size: 0.85rem; color: #4b5563; margin-top: 5px; line-height: 1.45; }}
+  .u-callout {{ background: #f1f6fc; border-left: 4px solid #2a7fd4; border-radius: 0 10px 10px 0;
+                padding: 12px 16px; font-size: 0.88rem; color: #33414f; line-height: 1.5; }}
+  .pipe {{ display: flex; align-items: stretch; gap: 0; flex-wrap: wrap; margin: 2px 0 4px; }}
+  .pipe-box {{ flex: 1; min-width: 140px; background: #fff; border: 1px solid #ebedf0;
+               border-top: 3px solid {VOLUE_ORANGE}; border-radius: 12px; padding: 11px 13px;
+               box-shadow: 0 2px 10px rgba(20,24,33,.05); }}
+  .pipe-box .t {{ font-weight: 700; color: {INK}; font-size: 0.88rem; }}
+  .pipe-box .s {{ font-size: 0.76rem; color: {MUTED}; margin-top: 3px; line-height: 1.35; }}
+  .pipe-arrow {{ display: flex; align-items: center; justify-content: center; padding: 0 9px; }}
+  .pipe-arrow::after {{ content: ''; width: 0; height: 0; border-top: 7px solid transparent;
+                        border-bottom: 7px solid transparent; border-left: 11px solid {VOLUE_ORANGE}; }}
+  .u-step {{ display: flex; gap: 12px; margin-bottom: 11px; align-items: flex-start; }}
+  .u-step .n {{ flex: 0 0 28px; height: 28px; width: 28px; border-radius: 50%;
+                background: {VOLUE_ORANGE}; color: #fff; font-weight: 700; font-size: 0.85rem;
+                display: flex; align-items: center; justify-content: center; }}
+  .u-step .x {{ font-size: 0.88rem; color: #374151; line-height: 1.45; padding-top: 3px; }}
 </style>
 """
 
