@@ -20,8 +20,8 @@ import plotly.graph_objects as go
 import streamlit as st
 from plotly.subplots import make_subplots
 
-#: Auto-reload the page every N seconds so the view tracks the refreshed database.
-AUTO_REFRESH_SECONDS = 60
+#: The live view re-reads the database (in place) every N seconds.
+AUTO_REFRESH_SECONDS = 120
 
 # ``streamlit run app/dashboard.py`` puts app/ on sys.path[0]; make the sibling
 # import robust regardless of the working directory the app is launched from.
