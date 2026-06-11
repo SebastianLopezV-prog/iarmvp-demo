@@ -81,8 +81,8 @@ _CSS = f"""
   .volue-bar .tag {{ background: {VOLUE_ORANGE}; color: #fff; border-radius: 6px;
                      padding: 1px 7px; font-weight: 700; font-size: .72rem; letter-spacing: 1px; }}
 
-  .sec {{ font-size: 1.05rem; font-weight: 800; letter-spacing: .4px;
-          color: {INK}; margin: 16px 0 6px; }}
+  .sec {{ font-size: 1.05rem; font-weight: 800; letter-spacing: .4px; color: {INK};
+          margin: 16px 0 8px; padding-left: 11px; border-left: 4px solid {VOLUE_ORANGE}; }}
   /* Make Streamlit captions readable (they default to a very faint grey). */
   [data-testid="stCaptionContainer"], [data-testid="stCaptionContainer"] p {{
       color: #4b5563 !important; font-size: 0.84rem !important; }}
