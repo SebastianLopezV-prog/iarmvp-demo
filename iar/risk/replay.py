@@ -182,6 +182,9 @@ def estimate_periods(
                 vintage=vintage,
                 n_mtus=len(kept),
                 report=report,
+                timestamps=[ts.isoformat() for ts in kept],
+                dam_pos=dam_pos,
+                gen=gen,
             )
         )
     return estimates
