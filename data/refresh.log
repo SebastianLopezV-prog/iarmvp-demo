@@ -985,3 +985,19 @@ Per-MTU head (positive = cost):
 2026-06-09 14:45:00+00:00         0.2366                   52.27   12.367082    -3.575026
 ================================================================
 Sign convention: imbalance = DAM position - actual delivery; positive cost = bad. Feeds the 3.3 backtest (iar.risk.backtest.run_backtest).
+================================================================
+IaR Monte Carlo  |  area=SE3  MTUs=133  scenarios=10,000  confidence=95%
+forecast vintage : 2026-06-11T12:38:44.603005+00:00   (LIVE Optimeering spread)
+DAM spot price   : LIVE (Optimeering DAM cleared price, internal SDK)
+portfolio        : REAL - 'SE3 Wind' loaded via client CSV path (windsim)
+imbalance model  : normal, sigma=10% of capacity
+================================================================
+GROSS  | IaR =       +4,447 EUR   CIaR =       +5,657 EUR   mean =         -344 EUR
+SPREAD | IaR =       +2,824 EUR   CIaR =       +3,673 EUR   mean =         -145 EUR
+================================================================
+IaR = worst-case settlement cost at the confidence level (positive = cost).
+CIaR = average cost in the worst (1 - confidence) tail.
+NOTE: spread + DAM spot LIVE; positions/generation REAL (windsim) when loaded; only the imbalance sigma remains a parametric stub (calibrated in Week 3).
+================================================================
+[stored] SimulationRun #33 (portfolio #3) + 2 IaRResult rows -> C:\Users\sebastian.lopez\OneDrive - Volue AS\Documents\Code\IAR MVP\data\iar.db
+[alerts] no limit breaches

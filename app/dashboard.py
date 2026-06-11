@@ -146,11 +146,11 @@ _CSS = f"""
   .pipe-arrow {{ display: flex; align-items: center; justify-content: center; padding: 0 9px; }}
   .pipe-arrow::after {{ content: ''; width: 0; height: 0; border-top: 7px solid transparent;
                         border-bottom: 7px solid transparent; border-left: 11px solid {VOLUE_ORANGE}; }}
-  .u-step {{ display: flex; gap: 12px; margin-bottom: 11px; align-items: flex-start; }}
-  .u-step .n {{ flex: 0 0 28px; height: 28px; width: 28px; border-radius: 50%;
-                background: {VOLUE_ORANGE}; color: #fff; font-weight: 700; font-size: 0.85rem;
+  .u-step {{ display: flex; gap: 14px; margin-bottom: 16px; align-items: flex-start; }}
+  .u-step .n {{ flex: 0 0 32px; height: 32px; width: 32px; border-radius: 50%;
+                background: {VOLUE_ORANGE}; color: #fff; font-weight: 700; font-size: 0.95rem;
                 display: flex; align-items: center; justify-content: center; }}
-  .u-step .x {{ font-size: 0.95rem; color: #374151; line-height: 1.5; padding-top: 3px; }}
+  .u-step .x {{ font-size: 1.08rem; color: #374151; line-height: 1.6; padding-top: 4px; }}
 </style>
 """
 
