@@ -1,0 +1,15 @@
+# Runtime dependencies for the synthetic demo (public PyPI only; no API key, no private SDK).
+# Used by hosts that build from requirements (e.g. Streamlit Community Cloud, Hugging Face
+# Spaces). The dashboard adds the repo root to sys.path, so the local `iar` package imports
+# without an editable install. The internal `optipyclient` wheel is NOT required: the demo
+# runs on synthetic feeds (iar.ingestion.synthetic) by default.
+numpy
+pandas
+scipy
+SQLAlchemy>=2.0
+streamlit
+plotly
+python-dotenv
+tenacity
+openpyxl
+optimeering

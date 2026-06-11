@@ -36,9 +36,8 @@ import pandas as pd
 
 from iar.db.models import DAMPosition, GenerationForecast, Portfolio
 from iar.db.session import DEFAULT_DB_PATH, get_session, init_db
+from iar.ingestion.clients import get_forecast_client, get_markets_client
 from iar.ingestion.flatfile_loader import get_or_create_portfolio
-from iar.ingestion.markets_client import OptimeeringMarketsClient
-from iar.ingestion.optimeering_client import OptimeeringForecastClient
 from iar.simulation.engine import EngineConfig, run_simulation
 from iar.simulation.imbalance_model import ImbalanceModel, ImbalanceModelConfig
 from iar.simulation.persistence import build_per_mtu, persist_report
@@ -67,7 +66,7 @@ def parse_args() -> argparse.Namespace:
 
 def fetch_spread_matrix(area: str):
     """Return (timestamps, percentile_levels, spread_matrix, vintage) from live forecast."""
-    recs = OptimeeringForecastClient().get_imbalance_price_forecast(area)
+    recs = get_forecast_client().get_imbalance_price_forecast(area)
     by_ts: dict[str, dict[float, float]] = defaultdict(dict)
     vintage = None
     for r in recs:
@@ -85,7 +84,7 @@ def fetch_spread_matrix(area: str):
 def fetch_dam_map(area: str):
     """Return {pd.Timestamp(UTC): price} of the real DAM cleared price, or {} on failure."""
     try:
-        recs = OptimeeringMarketsClient().get_dam_prices(area, start="-P1D", end="P3D")
+        recs = get_markets_client().get_dam_prices(area, start="-P1D", end="P3D")
     except Exception as exc:  # noqa: BLE001 — optipyclient missing / auth / lookup
         print(f"[warn] real DAM price unavailable ({type(exc).__name__}: "
               f"{str(exc)[:120]}); falling back to flat --dam-price.")
@@ -154,9 +153,11 @@ def main() -> None:
     n_mtus = len(keep)
 
     # DAM (spot) price
+    from iar.ingestion.clients import use_synthetic
     if dam_map:
         dam_price = np.array([dam_map[ft[i]] for i in keep])
-        dam_src = "LIVE (Optimeering DAM cleared price, internal SDK)"
+        dam_src = ("SYNTHETIC (demo market model)" if use_synthetic()
+                   else "LIVE (Optimeering DAM cleared price, internal SDK)")
     else:
         dam_price = np.full(n_mtus, args.dam_price)
         dam_src = f"flat {args.dam_price:.2f} EUR/MWh [STUB fallback]"
@@ -165,7 +166,7 @@ def main() -> None:
     if pos_map:
         dam_pos = np.array([pos_map[ft[i]][0] for i in keep])
         gen = np.array([pos_map[ft[i]][1] for i in keep])
-        pf_src = f"REAL - '{pf_name}' loaded via client CSV path (windsim)"
+        pf_src = f"loaded positions for '{pf_name}' (from database)"
     else:
         dam_pos, gen = stub_portfolio(n_mtus, args.capacity_mw, args.seed)
         pf_src = "STUB synthetic (no portfolio loaded — run scripts/load_windsim_data.py)"
@@ -187,7 +188,8 @@ def main() -> None:
     print(bar)
     print(f"IaR Monte Carlo  |  area={args.area}  MTUs={n_mtus}  "
           f"scenarios={rep.n_scenarios:,}  confidence={rep.confidence:.0%}")
-    print(f"forecast vintage : {vintage}   (LIVE Optimeering spread)")
+    spread_src = "SYNTHETIC demo spread" if use_synthetic() else "LIVE Optimeering spread"
+    print(f"forecast vintage : {vintage}   ({spread_src})")
     print(f"DAM spot price   : {dam_src}")
     print(f"portfolio        : {pf_src}")
     print(f"imbalance model  : {args.dist}, sigma={args.sigma_fraction:.0%} of capacity")
@@ -198,8 +200,12 @@ def main() -> None:
     print(bar)
     print("IaR = worst-case settlement cost at the confidence level (positive = cost).")
     print("CIaR = average cost in the worst (1 - confidence) tail.")
-    print("NOTE: spread + DAM spot LIVE; positions/generation REAL (windsim) when loaded; "
-          "only the imbalance sigma remains a parametric stub (calibrated in Week 3).")
+    if use_synthetic():
+        print("NOTE: this is the DEMO build - spread, DAM spot, prices and positions are all "
+              "SYNTHETIC (no real data, no API key). See iar/ingestion/synthetic.py.")
+    else:
+        print("NOTE: live feeds in use (Optimeering); positions from loaded data; "
+              "only the imbalance sigma is a parametric stub.")
 
     if args.store:
         init_db()

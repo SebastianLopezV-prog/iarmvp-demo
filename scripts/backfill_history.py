@@ -23,8 +23,7 @@ import pandas as pd
 
 from iar.db.models import DAMPosition, GenerationForecast, Portfolio
 from iar.db.session import DEFAULT_DB_PATH, get_session, init_db
-from iar.ingestion.markets_client import OptimeeringMarketsClient
-from iar.ingestion.optimeering_client import OptimeeringForecastClient
+from iar.ingestion.clients import get_forecast_client, get_markets_client
 from iar.risk.replay import MTU_HOURS, backfill_iar
 from iar.simulation.engine import EngineConfig
 from iar.simulation.imbalance_model import ImbalanceModelConfig
@@ -72,13 +71,13 @@ def main() -> None:
         )
 
     # Real DAM (spot) price over the window (one historical time-series call).
-    dam_recs = OptimeeringMarketsClient().get_dam_prices(
+    dam_recs = get_markets_client().get_dam_prices(
         args.area, start=f"-P{args.days + 1}D", end="P2D"
     )
     dam_map = {pd.to_datetime(r["timestamp"], utc=True): float(r["eur_per_mwh"]) for r in dam_recs}
 
     # One day-ahead forecast vintage per day (max_event_time = that day's UTC start).
-    fc = OptimeeringForecastClient()
+    fc = get_forecast_client()
     now = datetime.now(timezone.utc)
     records: list[dict] = []
     for k in range(args.days, -1, -1):

@@ -24,8 +24,11 @@ from plotly.subplots import make_subplots
 AUTO_REFRESH_SECONDS = 300
 
 # ``streamlit run app/dashboard.py`` puts app/ on sys.path[0]; make the sibling
-# import robust regardless of the working directory the app is launched from.
+# import robust regardless of the working directory the app is launched from. Also add
+# the repo root so the ``iar`` package imports on a host WITHOUT an editable install
+# (e.g. Streamlit Community Cloud, which only runs ``pip install -r requirements.txt``).
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from data_source import get_data_source  # noqa: E402
 
 # --------------------------------------------------------------------------- #
@@ -1080,9 +1083,17 @@ def _render_limits(kind: str) -> None:
             st.rerun()
 
 
+@st.cache_resource(show_spinner="Preparing demo data...")
+def _ensure_data() -> str:
+    """Self-seed the synthetic database on a fresh host (runs once per server process)."""
+    from bootstrap import ensure_demo_data
+    return ensure_demo_data()
+
+
 def main() -> None:
     st.set_page_config(page_title="Imbalance at Risk", layout="wide")
     st.markdown(_CSS, unsafe_allow_html=True)
+    _ensure_data()  # build synthetic data if the DB is empty (no-op once seeded)
     kind = "live"
 
     header_box = st.container()  # header rendered once, above the tab strip
