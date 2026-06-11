@@ -272,6 +272,12 @@ def render_intraday(df: pd.DataFrame, basis: str) -> None:
     if pd.notna(mtu_limit):
         fig.add_hline(y=mtu_limit, line=dict(color=BREACH_RED, dash="dash"),
                       annotation_text="MTU limit", annotation_position="top left")
+    # Demarcate the next day if the forecast horizon crosses midnight.
+    dts = pd.to_datetime(df["timestamp"])
+    nxt = dts[dts.dt.date > dts.dt.date.iloc[0]]
+    if not nxt.empty:
+        fig.add_vline(x=nxt.iloc[0].timestamp() * 1000, line=dict(color="#374151", width=1.5, dash="dot"),
+                      annotation_text="Next day", annotation_position="top")
     _style_fig(fig)
     fig.update_layout(barmode="overlay", height=340, bargap=0.2)
     fig.update_yaxes(title_text=f"{basis.capitalize()} IaR (EUR)", secondary_y=False)
