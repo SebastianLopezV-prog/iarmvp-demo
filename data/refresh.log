@@ -655,3 +655,78 @@ Per-MTU head (positive = cost):
 2026-06-09 14:15:00+00:00         0.2950                   25.37    7.484150    -2.566500
 ================================================================
 Sign convention: imbalance = DAM position - actual delivery; positive cost = bad. Feeds the 3.3 backtest (iar.risk.backtest.run_backtest).
+================================================================
+IaR backtest (3.3) | area=NO1 portfolio='NO1 Wind' (#1)
+================================================================
+----------------------------------------------------------------
+basis: GROSS  (confidence n/a)
+  no settled periods to compare yet — load realised prices (load_actuals.py) and backfill estimates (backfill_iar.py).
+----------------------------------------------------------------
+basis: SPREAD  (confidence n/a)
+  no settled periods to compare yet — load realised prices (load_actuals.py) and backfill estimates (backfill_iar.py).
+================================================================
+stored -> C:\Users\sebastian.lopez\OneDrive - Volue AS\Documents\Code\IAR MVP\data\iar.db  (read back via iar.risk.backtest.load_performance_records)
+note: with --basis both, only GROSS records were persisted (HistoricalPerformanceRecord has no basis column).
+================================================================
+IaR backtest (3.3) | area=NO2 portfolio='NO2 Wind' (#2)
+================================================================
+----------------------------------------------------------------
+basis: GROSS  (confidence 95%)
+    period iar_estimate realised_cost exceeded
+2026-06-09        5,902           685   within
+2026-06-10        3,281          -859   within
+2026-06-11        1,154        -1,835   within
+----------------------------------------------------------------
+exceedances    : 0 / 3  (observed 0%, expected ~5%)
+Kupiec POF     : LR=0.308  p-value=0.579  ->  CALIBRATED (alpha=5%)
+records        : persisted
+----------------------------------------------------------------
+basis: SPREAD  (confidence 95%)
+    period iar_estimate realised_cost exceeded
+2026-06-09          697          -110   within
+2026-06-10          934           122   within
+2026-06-11          594           -44   within
+----------------------------------------------------------------
+exceedances    : 0 / 3  (observed 0%, expected ~5%)
+Kupiec POF     : LR=0.308  p-value=0.579  ->  CALIBRATED (alpha=5%)
+records        : NOT persisted (only the first basis persists with --basis both)
+================================================================
+stored -> C:\Users\sebastian.lopez\OneDrive - Volue AS\Documents\Code\IAR MVP\data\iar.db  (read back via iar.risk.backtest.load_performance_records)
+note: with --basis both, only GROSS records were persisted (HistoricalPerformanceRecord has no basis column).
+================================================================
+IaR backtest (3.3) | area=SE3 portfolio='SE3 Wind' (#3)
+================================================================
+----------------------------------------------------------------
+basis: GROSS  (confidence 95%)
+    period iar_estimate realised_cost exceeded
+2026-06-09        6,397         1,073   within
+2026-06-10        3,880          -264   within
+2026-06-11        1,665        -1,476   within
+----------------------------------------------------------------
+exceedances    : 0 / 3  (observed 0%, expected ~5%)
+Kupiec POF     : LR=0.308  p-value=0.579  ->  CALIBRATED (alpha=5%)
+records        : persisted
+----------------------------------------------------------------
+basis: SPREAD  (confidence 95%)
+    period iar_estimate realised_cost exceeded
+2026-06-09        2,156           367   within
+2026-06-10        3,033           301   within
+2026-06-11        2,002          -101   within
+----------------------------------------------------------------
+exceedances    : 0 / 3  (observed 0%, expected ~5%)
+Kupiec POF     : LR=0.308  p-value=0.579  ->  CALIBRATED (alpha=5%)
+records        : NOT persisted (only the first basis persists with --basis both)
+================================================================
+stored -> C:\Users\sebastian.lopez\OneDrive - Volue AS\Documents\Code\IAR MVP\data\iar.db  (read back via iar.risk.backtest.load_performance_records)
+note: with --basis both, only GROSS records were persisted (HistoricalPerformanceRecord has no basis column).
+[refresh] 2026-06-11T12:15:02.307188+00:00  mode=fast  areas=['NO1', 'NO2', 'SE3']
+--- NO1: live IaR ---
+--- NO1: realised prices ---
+--- NO2: live IaR ---
+--- NO2: realised prices ---
+--- SE3: live IaR ---
+--- SE3: realised prices ---
+--- NO1: backtest ---
+--- NO2: backtest ---
+--- SE3: backtest ---
+[refresh] done in 96s; pruned 3 stale live run(s).
