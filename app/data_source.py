@@ -122,7 +122,7 @@ class DataSource(ABC):
 _EMPTY_INTRADAY = pd.DataFrame(
     columns=["timestamp", "forecast_iar", "realised_iar", "position_mwh", "mtu_limit", "is_past"]
 )
-_EMPTY_HEATMAP = pd.DataFrame(columns=["hour", "quarter", "iar"])
+_EMPTY_HEATMAP = pd.DataFrame(columns=["hour", "quarter", "forecast_iar", "realised_iar"])
 _EMPTY_LIMITS = pd.DataFrame(
     columns=["label", "iar_type", "limit_type", "current_iar", "limit", "utilisation", "severity"]
 )
