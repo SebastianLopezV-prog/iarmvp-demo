@@ -41,7 +41,7 @@ from iar.ingestion.markets_client import OptimeeringMarketsClient
 from iar.ingestion.optimeering_client import OptimeeringForecastClient
 from iar.simulation.engine import EngineConfig, run_simulation
 from iar.simulation.imbalance_model import ImbalanceModel, ImbalanceModelConfig
-from iar.simulation.persistence import persist_report
+from iar.simulation.persistence import build_per_mtu, persist_report
 from iar.simulation.price_sampler import QuantilePriceSampler
 
 MTU_HOURS = 0.25  # 15-minute MTU
