@@ -131,13 +131,14 @@ _CSS = f"""
   .u-hero .lead {{ font-size: 1.2rem; color: {INK}; line-height: 1.6; }}
   .u-hero .sub {{ font-size: 1.0rem; color: {MUTED}; margin-top: 10px; }}
   /* Feature cards (top rule + outline icon + large heading + body), like the reference. */
-  .feat {{ padding-right: 14px; margin-bottom: 18px; }}
-  .feat .rule {{ border-top: 1px solid #cfd4da; margin: 0 0 22px; }}
-  .feat .ic {{ margin-bottom: 18px; height: 32px; }}
-  .feat .ic svg {{ width: 32px; height: 32px; stroke: {INK}; fill: none;
-                   stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }}
-  .feat .h {{ font-size: 1.5rem; font-weight: 700; color: {INK}; line-height: 1.22; margin: 0 0 15px; }}
-  .feat .p {{ font-size: 1.08rem; color: #3a4452; line-height: 1.6; }}
+  .feat {{ padding-right: 14px; margin-bottom: 20px; }}
+  .feat .rule {{ border-top: 3px solid #cfd4da; border-radius: 2px; margin: 0 0 18px; }}
+  .feat .ic {{ width: 48px; height: 48px; border-radius: 13px; display: flex;
+               align-items: center; justify-content: center; margin-bottom: 16px; }}
+  .feat .ic svg {{ width: 26px; height: 26px; stroke: currentColor; fill: none;
+                   stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }}
+  .feat .h {{ font-size: 1.42rem; font-weight: 700; color: {INK}; line-height: 1.22; margin: 0 0 13px; }}
+  .feat .p {{ font-size: 1.06rem; color: #3a4452; line-height: 1.6; }}
   .u-card {{ border: 1px solid #ebedf0; border-radius: 12px; padding: 13px 15px; background: #fff;
              height: 100%; box-shadow: 0 2px 10px rgba(20,24,33,.05); }}
   .u-card .term {{ font-weight: 800; color: {INK}; font-size: 1.02rem; }}
