@@ -377,17 +377,53 @@ def render_settings(kind: str):
                    "`scripts/run_iar.py --store`.")
         st.stop()
 
+    # Selections persist in the URL query params so the 60s auto-refresh (a full page
+    # reload) keeps the chosen portfolio/basis instead of snapping back to defaults.
+    qp = st.query_params
+
+    def _qp(key, default):
+        return qp.get(key, default)
+
     labels = [f"{r['price_area']} · {r['name']}" for _, r in pfs.iterrows()]
-    idx = st.selectbox("Portfolio", range(len(labels)), format_func=lambda i: labels[i])
+    try:
+        idx_default = min(max(int(_qp("pf", 0)), 0), len(labels) - 1)
+    except ValueError:
+        idx_default = 0
+    idx = st.selectbox("Portfolio", range(len(labels)), index=idx_default,
+                       format_func=lambda i: labels[i])
     pf = pfs.iloc[idx].to_dict()
 
-    basis = st.radio("IaR basis", ["gross", "spread"], horizontal=True, format_func=str.capitalize)
-    confidence = st.select_slider("Confidence (α)", options=[0.90, 0.95, 0.99], value=0.95,
+    basis_opts = ["gross", "spread"]
+    basis_default = basis_opts.index(_qp("basis", "gross")) if _qp("basis", "gross") in basis_opts else 0
+    basis = st.radio("IaR basis", basis_opts, index=basis_default, horizontal=True,
+                     format_func=str.capitalize)
+
+    conf_opts = [0.90, 0.95, 0.99]
+    try:
+        conf_default = float(_qp("conf", 0.95))
+    except ValueError:
+        conf_default = 0.95
+    confidence = st.select_slider("Confidence (α)", options=conf_opts,
+                                  value=conf_default if conf_default in conf_opts else 0.95,
                                   format_func=lambda c: f"{c:.0%}  (α={1 - c:.2f})")
-    significance = st.select_slider("Kupiec significance", options=[0.01, 0.05, 0.10], value=0.05)
-    if st.button("↻ Refresh data", use_container_width=True):
+    sig_opts = [0.01, 0.05, 0.10]
+    try:
+        sig_default = float(_qp("sig", 0.05))
+    except ValueError:
+        sig_default = 0.05
+    significance = st.select_slider("Kupiec significance", options=sig_opts,
+                                    value=sig_default if sig_default in sig_opts else 0.05)
+
+    # Persist the selection to the URL (no rerun) for the next auto-reload.
+    st.query_params.update(
+        {"pf": str(idx), "basis": basis, "conf": str(confidence), "sig": str(significance)}
+    )
+
+    if st.button("↻ Refresh data now", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
+    st.caption("⟳ The view auto-refreshes every 60s; data is kept current by the "
+               "scheduled `scripts/refresh.py` pipeline.")
 
     st.divider()
     st.caption(
