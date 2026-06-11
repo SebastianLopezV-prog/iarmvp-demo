@@ -178,9 +178,9 @@ the backtest view, end-to-end tests across NO1/NO2/SE3, documentation, and demo 
 
 ## Repo
 
-Primary: `Volue/iarmvp` (GitHub). A backup remote `personal` points at
-`SebastianLopezV-prog/iarmvp`. A local PostToolUse hook auto-commits after each edit;
-pushes are manual.
+Primary: `Volue/iarmvp-live` (GitHub; renamed from `Volue/iarmvp`). A backup remote
+`personal` points at `SebastianLopezV-prog/iarmvp`. A local PostToolUse hook auto-commits
+after each edit; pushes are manual.
 
 ---
 
