@@ -32,8 +32,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 def parse_args() -> argparse.Namespace:
     ap = argparse.ArgumentParser(description="Seed a clean one-portfolio-per-area demo.")
-    ap.add_argument("--areas", nargs="+", default=["NO1", "NO2", "SE3"],
-                    help="price areas to seed (default NO1 NO2 SE3)")
+    ap.add_argument("--areas", nargs="+", default=["NO2"],
+                    help="price areas to seed (MVP focuses on NO2 only)")
     ap.add_argument("--windsim-portfolio", default="north", help="windsim source portfolio")
     ap.add_argument("--keep", action="store_true",
                     help="do not wipe existing portfolios first")
