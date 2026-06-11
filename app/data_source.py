@@ -272,7 +272,7 @@ class ServiceDataSource(DataSource):
             verb = "Breach" if sev == "hard" else "Warning"
             rows.append(
                 {
-                    "ts": a["breach_ts"],
+                    "ts": _to_local(a["breach_ts"]),
                     "title": f"{verb} — {str(a['iar_type']).capitalize()} {a['limit_type']}",
                     "body": (
                         f"IaR €{a['iar_value']:,.0f} vs limit €{a['limit_value']:,.0f}"
