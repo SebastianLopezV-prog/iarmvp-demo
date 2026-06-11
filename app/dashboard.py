@@ -809,17 +809,17 @@ def render_usage() -> None:
     section("How it works")
     st.markdown(
         "<div class='pipe'>"
-        "<div class='pipe-box'><div class='t'>Live inputs</div><div class='s'>Optimeering price "
-        "spread, day-ahead price, positions and generation</div></div>"
+        f"<div class='pipe-box' style='border-top-color:{BLUE}'><div class='t'>Live inputs</div>"
+        "<div class='s'>Optimeering price spread, day-ahead price, positions and generation</div></div>"
         "<div class='pipe-arrow'></div>"
-        "<div class='pipe-box'><div class='t'>Monte Carlo</div><div class='s'>10,000 scenarios; "
-        "price and volume sampled independently</div></div>"
+        f"<div class='pipe-box' style='border-top-color:{VOLUE_ORANGE}'><div class='t'>Monte Carlo"
+        "</div><div class='s'>10,000 scenarios; price and volume sampled independently</div></div>"
         "<div class='pipe-arrow'></div>"
-        "<div class='pipe-box'><div class='t'>Risk read-off</div><div class='s'>IaR, CIaR, "
-        "per-MTU and period figures from the cost distribution</div></div>"
+        f"<div class='pipe-box' style='border-top-color:{PURPLE}'><div class='t'>Risk read-off</div>"
+        "<div class='s'>IaR, CIaR, per-MTU and period figures from the cost distribution</div></div>"
         "<div class='pipe-arrow'></div>"
-        "<div class='pipe-box'><div class='t'>Dashboard</div><div class='s'>Stored in the "
-        "database and read by this view</div></div>"
+        f"<div class='pipe-box' style='border-top-color:{TEAL}'><div class='t'>Dashboard</div>"
+        "<div class='s'>Stored in the database and read by this view</div></div>"
         "</div>",
         unsafe_allow_html=True,
     )
