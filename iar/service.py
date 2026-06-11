@@ -242,6 +242,92 @@ def get_limit_status(
         )
 
 
+_INTRADAY_COLS = [
+    "timestamp", "gross_iar", "gross_ciar", "spread_iar", "spread_ciar",
+    "position_mwh", "expected_imbalance_mwh",
+]
+_LIMIT_OVERVIEW_COLS = [
+    "iar_type", "limit_type", "iar_value", "limit_value", "utilisation", "severity",
+]
+
+
+def get_intraday(portfolio_id: int, *, session: Session | None = None) -> pd.DataFrame:
+    """Per-MTU IaR series for the latest run (gross & spread), with positions.
+
+    Columns ``[timestamp, gross_iar, gross_ciar, spread_iar, spread_ciar,
+    position_mwh, expected_imbalance_mwh]``, one row per MTU — the series behind the
+    dashboard's intraday bars and risk heatmap. Empty if the latest run stored no
+    per-MTU detail (e.g. older runs predating the per-MTU read-off).
+    """
+    empty = pd.DataFrame(columns=_INTRADAY_COLS)
+    with _scope(session) as s:
+        run = _latest_run(s, portfolio_id)
+        if run is None or not run.per_mtu_json:
+            return empty
+        data = json.loads(run.per_mtu_json)
+        g, sp = data.get("gross", {}), data.get("spread", {})
+        return pd.DataFrame(
+            {
+                "timestamp": pd.to_datetime(data["timestamps"], utc=True),
+                "gross_iar": g.get("iar"),
+                "gross_ciar": g.get("ciar"),
+                "spread_iar": sp.get("iar"),
+                "spread_ciar": sp.get("ciar"),
+                "position_mwh": data.get("position_mwh"),
+                "expected_imbalance_mwh": data.get("expected_imbalance_mwh"),
+            },
+            columns=_INTRADAY_COLS,
+        )
+
+
+def get_limit_overview(portfolio_id: int, *, session: Session | None = None) -> pd.DataFrame:
+    """Latest run's IaR vs limits across **all** limit types (day / rolling / per-MTU).
+
+    Unlike :func:`get_limit_status` (one limit type, period IaR only), this compares
+    the right current figure to each configured limit: the period IaR for
+    ``remaining_day``, the rolling-window IaR for ``rolling_window`` and the peak-MTU
+    IaR for ``per_mtu`` (the last two from the run's per-MTU detail). Columns
+    ``[iar_type, limit_type, iar_value, limit_value, utilisation, severity]``; empty
+    if no run or no limits config. Computed on read.
+    """
+    empty = pd.DataFrame(columns=_LIMIT_OVERVIEW_COLS)
+    with _scope(session) as s:
+        run = _latest_run(s, portfolio_id)
+        if run is None:
+            return empty
+        try:
+            config = load_limits()
+        except FileNotFoundError:
+            return empty
+        period = {r.iar_type: r.iar_value for r in run.results}
+        detail = json.loads(run.per_mtu_json) if run.per_mtu_json else {}
+        name = run.portfolio.name
+        rows = []
+        for basis in ("gross", "spread"):
+            block = detail.get(basis, {})
+            current = {
+                "remaining_day": period.get(basis),
+                "rolling_window": block.get("rolling_iar"),
+                "per_mtu": block.get("peak_iar"),
+            }
+            for limit_type in ("remaining_day", "rolling_window", "per_mtu"):
+                cur = current[limit_type]
+                limit = config.limit_for(name, basis, limit_type)
+                if cur is None or limit is None:
+                    continue
+                rows.append(
+                    {
+                        "iar_type": basis,
+                        "limit_type": limit_type,
+                        "iar_value": cur,
+                        "limit_value": limit,
+                        "utilisation": (cur / limit if limit else float("nan")),
+                        "severity": classify_severity(cur, limit),
+                    }
+                )
+        return pd.DataFrame(rows, columns=_LIMIT_OVERVIEW_COLS)
+
+
 def get_alerts(portfolio_id: int, *, session: Session | None = None) -> pd.DataFrame:
     """Persisted limit-breach alerts for a portfolio (newest first).
 
