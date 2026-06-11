@@ -232,21 +232,29 @@ def render_intraday(df: pd.DataFrame, basis: str) -> None:
 
 
 def render_heatmap(df: pd.DataFrame, basis: str) -> None:
-    st.markdown(f"##### MTU Risk Heatmap — {basis.capitalize()} IaR intensity")
+    st.markdown(f"##### MTU Risk Heatmap — {basis.capitalize()} IaR intensity (Norway time)")
     if df.empty:
-        st.info("No per-MTU series from this source (period IaR only).", icon="ℹ️")
+        st.info("No per-MTU series for this run.", icon="ℹ️")
         return
-    grid = df.pivot(index="quarter", columns="hour", values="iar").sort_index()
+    # Always render a full 24h × 4-quarter clock-face; MTUs the run didn't cover
+    # (already-settled morning, or beyond the forecast horizon) stay grey.
+    grid = (
+        df.pivot_table(index="quarter", columns="hour", values="iar", aggfunc="mean")
+        .reindex(index=[0, 15, 30, 45], columns=list(range(24)))
+    )
     fig = go.Figure(
         go.Heatmap(
             z=grid.values, x=[f"{h:02d}" for h in grid.columns],
             y=[f":{q:02d}" for q in grid.index],
             colorscale=[[0, "#FFF6EE"], [0.5, VOLUE_ORANGE], [1, BREACH_RED]],
-            colorbar=dict(title="€"),
+            colorbar=dict(title="€"), hoverongaps=False,
+            xgap=1, ygap=1,
         )
     )
-    fig.update_layout(height=220, margin=dict(l=10, r=10, t=10, b=10),
-                      xaxis_title="Hour", yaxis_title="Quarter")
+    fig.update_layout(height=240, margin=dict(l=10, r=10, t=10, b=10),
+                      xaxis_title="Hour of day (00–23, Norway time)", yaxis_title="Quarter",
+                      plot_bgcolor="#e9e9ec")  # grey shows through for un-simulated MTUs
+    fig.update_xaxes(dtick=1)
     st.plotly_chart(fig, use_container_width=True)
 
 
