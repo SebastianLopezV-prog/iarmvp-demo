@@ -33,6 +33,7 @@ def persist_report(
     horizon: str,
     run_ts: datetime | None = None,
     extra_config: dict | None = None,
+    per_mtu: dict | None = None,
 ) -> SimulationRun:
     """Write an :class:`IaRReport` as a ``SimulationRun`` + two ``IaRResult`` rows.
 
