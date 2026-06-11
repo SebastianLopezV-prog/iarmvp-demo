@@ -103,12 +103,15 @@ class EngineConfig:
     n_scenarios: int = 10_000
     confidence: float = 0.95
     seed: int | None = 42
+    rolling_window_mtus: int = 16  # 4h at 15-min MTUs — for the rolling-window IaR read-off
 
     def __post_init__(self) -> None:
         if self.n_scenarios <= 0:
             raise ValueError(f"n_scenarios must be > 0, got {self.n_scenarios}")
         if not (0.0 < self.confidence < 1.0):
             raise ValueError(f"confidence must be in (0, 1), got {self.confidence}")
+        if self.rolling_window_mtus <= 0:
+            raise ValueError(f"rolling_window_mtus must be > 0, got {self.rolling_window_mtus}")
 
 
 @dataclass
