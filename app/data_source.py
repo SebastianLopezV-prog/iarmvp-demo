@@ -220,31 +220,28 @@ class ServiceDataSource(DataSource):
         un-settled ones carry the forecast IaR. Timestamps are returned in local time.
         """
         fc = self._svc.get_intraday(portfolio_id)
-        # Delivery day (local) to bound the realised lookup to the same calendar day.
-        if not fc.empty:
-            day_local = pd.to_datetime(fc["timestamp"], utc=True).min().tz_convert(
-                DISPLAY_TZ
-            ).normalize()
-        else:
-            day_local = pd.Timestamp.now(tz=DISPLAY_TZ).normalize()
-        day_start = day_local.tz_convert("UTC").to_pydatetime()
-        day_end = (day_local + pd.Timedelta(days=1)).tz_convert("UTC").to_pydatetime()
+        now = pd.Timestamp.now(tz=DISPLAY_TZ)
+        today0 = now.normalize()
+        # Realised: today's settled MTUs (one calendar day).
+        day_start = today0.tz_convert("UTC").to_pydatetime()
+        day_end = (today0 + pd.Timedelta(days=1)).tz_convert("UTC").to_pydatetime()
         rl = self._svc.get_realised_intraday(portfolio_id, day_start, day_end)
+        # Forecast: from the start of today up to 24h ahead (may cross into tomorrow;
+        # the heatmap/chart demarcate the day boundary rather than collapsing days).
+        start_utc = today0.tz_convert("UTC")
+        horizon_utc = (now + pd.Timedelta(hours=24)).tz_convert("UTC")
 
         fc_part = pd.DataFrame(columns=["timestamp", "forecast_iar", "position_mwh"])
         if not fc.empty:
-            # The live forecast can run past midnight into tomorrow; keep only the
-            # current delivery day so tomorrow's MTUs don't collapse onto the same
-            # hour-of-day grid (which would wrongly fill the "morning").
             fc_utc = pd.to_datetime(fc["timestamp"], utc=True)
-            day_mask = (fc_utc >= pd.Timestamp(day_start)) & (fc_utc < pd.Timestamp(day_end))
-            fc_day = fc[day_mask.to_numpy()]
-            if not fc_day.empty:
+            mask = (fc_utc >= start_utc) & (fc_utc <= horizon_utc)
+            fc_h = fc[mask.to_numpy()]
+            if not fc_h.empty:
                 fc_part = pd.DataFrame(
                     {
-                        "timestamp": pd.to_datetime(fc_day["timestamp"], utc=True),
-                        "forecast_iar": fc_day[f"{basis}_iar"],
-                        "position_mwh": fc_day["position_mwh"],
+                        "timestamp": pd.to_datetime(fc_h["timestamp"], utc=True),
+                        "forecast_iar": fc_h[f"{basis}_iar"],
+                        "position_mwh": fc_h["position_mwh"],
                     }
                 )
         rl_part = pd.DataFrame(columns=["timestamp", "realised_iar"])
