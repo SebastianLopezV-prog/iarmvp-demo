@@ -218,8 +218,10 @@ def render_intraday(df: pd.DataFrame, basis: str) -> None:
                    line=dict(color="#2a9d8f", width=2)),
         secondary_y=True,
     )
-    fig.add_hline(y=float(df["mtu_limit"].iloc[0]), line=dict(color=BREACH_RED, dash="dash"),
-                  annotation_text="MTU limit", annotation_position="top left")
+    mtu_limit = float(df["mtu_limit"].iloc[0])
+    if pd.notna(mtu_limit):
+        fig.add_hline(y=mtu_limit, line=dict(color=BREACH_RED, dash="dash"),
+                      annotation_text="MTU limit", annotation_position="top left")
     fig.update_layout(
         barmode="overlay", height=340, margin=dict(l=10, r=10, t=10, b=10),
         legend=dict(orientation="h", y=1.12), bargap=0.15,
