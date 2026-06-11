@@ -50,7 +50,7 @@ from sqlalchemy.orm import Session
 from iar.db.models import Portfolio, SimulationRun
 from iar.simulation.engine import EngineConfig, IaRReport, run_simulation
 from iar.simulation.imbalance_model import ImbalanceModel, ImbalanceModelConfig
-from iar.simulation.persistence import persist_report
+from iar.simulation.persistence import build_per_mtu, persist_report
 from iar.simulation.price_sampler import QuantilePriceSampler
 
 # windsim/Optimeering quantities are MWh per 15-minute MTU.
