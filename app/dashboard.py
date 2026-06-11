@@ -886,7 +886,7 @@ def render_settings(kind: str):
         st.warning("No portfolios available yet.")
         st.stop()
 
-    # Selections persist in the URL query params so the 60s auto-refresh (a full page
+    # Selections persist in the URL query params so the periodic auto-refresh (a full page
     # reload) keeps the chosen portfolio/basis instead of snapping back to defaults.
     qp = st.query_params
 
