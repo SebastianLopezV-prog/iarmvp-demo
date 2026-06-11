@@ -1083,7 +1083,7 @@ def _render_limits(kind: str) -> None:
             st.rerun()
 
 
-@st.cache_resource(show_spinner="Preparing demo data...")
+@st.cache_resource(show_spinner="Preparing live demo data...")
 def _ensure_data() -> str:
     """Self-seed the synthetic database on a fresh host (runs once per server process)."""
     from bootstrap import ensure_demo_data
@@ -1095,6 +1095,18 @@ def main() -> None:
     st.markdown(_CSS, unsafe_allow_html=True)
     _ensure_data()  # build synthetic data if the DB is empty (no-op once seeded)
     kind = "live"
+
+    # Living demo: a lightweight fragment that advances the synthetic data forward when
+    # it goes stale (new settled MTUs, fresh forecast, updated backtest), so the hosted
+    # demo keeps ticking while it is open rather than showing a frozen snapshot.
+    @st.fragment(run_every=AUTO_REFRESH_SECONDS)
+    def _live_tick() -> None:
+        try:
+            from bootstrap import maybe_advance
+            maybe_advance()
+        except Exception:
+            pass
+    _live_tick()
 
     header_box = st.container()  # header rendered once, above the tab strip
     tabs = st.tabs(["Command Centre", "Risk Analytics", "Historical", "Usage", "Settings"])

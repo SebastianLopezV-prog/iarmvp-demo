@@ -1,15 +1,17 @@
-"""Boot-time data guard for the hosted / synthetic demo.
+"""Boot-time and live-tick data guard for the hosted / synthetic demo.
 
-Makes the demo self-contained on a fresh host, where the database is absent (``iar.db``
-is gitignored) and windsim is not installed:
+Makes the demo self-contained and *living* on a host, where the database is absent
+(``iar.db`` is gitignored), windsim is not installed, and there is no scheduled task:
 
-* if the database has **no simulation runs**, build a full synthetic dataset
-  (positions + day-ahead history + realised prices + a live run + backtest);
-* if data exists but is **stale** and ``IAR_DEMO_AUTOREFRESH`` is set, run a fast
-  forward refresh so the view always looks current.
+* :func:`ensure_demo_data` - run once at startup. If the database has no simulation
+  runs, it builds a full synthetic dataset (positions + day-ahead history + realised
+  prices + a live run + backtest). This is the blocking first-load seed.
+* :func:`maybe_advance` - call repeatedly from a Streamlit ``run_every`` fragment. When
+  the latest run is older than the refresh interval, it runs a fast synthetic forward
+  refresh so new MTUs settle, the heatmap fills in, the IaR curve gains points and the
+  "as of" clock advances. A short lock prevents concurrent viewers from stampeding.
 
 All work uses the synthetic feeds (``IAR_SYNTHETIC=1``), so nothing external is needed.
-Safe to call on every startup: the heavy path runs only when the database is empty.
 """
 
 from __future__ import annotations
@@ -17,14 +19,22 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
-from datetime import datetime, timedelta, timezone
+import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
-# Lighter than the manual seed so first page load on a cold host stays reasonable.
-BOOT_SEED_DAYS = "21"
-BOOT_SEED_SCENARIOS = "5000"
+# First-load seed: kept modest so a cold host paints reasonably quickly, while still
+# showing a couple of weeks of backtest history.
+BOOT_SEED_DAYS = "14"
+BOOT_SEED_SCENARIOS = "3000"
+
+# Live cadence: advance the synthetic data when the newest run is older than this. Ten
+# minutes matches the real 15-min settlement rhythm without thrashing.
+REFRESH_STALE_MINUTES = 10
+_LOCK = PROJECT_ROOT / "data" / "refresh.lock"
+_LOCK_TTL_SECONDS = 180
 
 
 def _run(script: str, *args: str) -> None:
@@ -45,21 +55,53 @@ def _latest_run_ts():
         return run.run_ts if run else None
 
 
-def ensure_demo_data(stale_minutes: int = 90) -> str:
-    """Seed on an empty DB; optionally fast-refresh a stale one. Returns a status string."""
+def _age_minutes(ts) -> float:
+    lt = ts if ts.tzinfo else ts.replace(tzinfo=timezone.utc)
+    return (datetime.now(timezone.utc) - lt).total_seconds() / 60.0
+
+
+def ensure_demo_data() -> str:
+    """Seed the synthetic database if it is empty (blocking first-load). Returns status."""
     try:
         latest = _latest_run_ts()
     except Exception:
         latest = None
-
     if latest is None:
         _run("seed_synthetic_demo.py", "--area", "NO2",
              "--days", BOOT_SEED_DAYS, "--scenarios", BOOT_SEED_SCENARIOS)
         return "seeded"
-
-    if os.getenv("IAR_DEMO_AUTOREFRESH"):
-        lt = latest if latest.tzinfo else latest.replace(tzinfo=timezone.utc)
-        if datetime.now(timezone.utc) - lt > timedelta(minutes=stale_minutes):
-            _run("refresh.py", "--areas", "NO2")
-            return "refreshed"
     return "ok"
+
+
+def maybe_advance() -> str:
+    """Advance the synthetic data forward if it is stale. Safe to call every few minutes.
+
+    Returns one of ``"seeded"`` / ``"advanced"`` / ``"fresh"`` / ``"locked"`` / ``"error"``.
+    A small lock file debounces concurrent viewers so only one refresh runs at a time.
+    """
+    try:
+        latest = _latest_run_ts()
+    except Exception:
+        return "error"
+
+    if latest is None:
+        return ensure_demo_data()
+    if _age_minutes(latest) < REFRESH_STALE_MINUTES:
+        return "fresh"
+
+    # Debounce: skip if another viewer started a refresh in the last few minutes.
+    try:
+        if _LOCK.exists() and (time.time() - _LOCK.stat().st_mtime) < _LOCK_TTL_SECONDS:
+            return "locked"
+        _LOCK.write_text(datetime.now(timezone.utc).isoformat())
+    except Exception:
+        pass
+
+    try:
+        _run("refresh.py", "--areas", "NO2")
+        return "advanced"
+    finally:
+        try:
+            _LOCK.unlink()
+        except Exception:
+            pass

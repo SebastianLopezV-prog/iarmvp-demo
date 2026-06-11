@@ -10,6 +10,10 @@ dist/
 
 # Local data artifacts (keep the folders via .gitkeep, ignore contents)
 data/iar.db
+data/iar.db-wal
+data/iar.db-shm
+data/refresh.lock
+data/refresh.log
 data/cache/*
 data/uploads/*
 !data/cache/.gitkeep
