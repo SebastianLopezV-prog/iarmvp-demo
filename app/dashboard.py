@@ -935,7 +935,8 @@ def render_settings(kind: str):
     if st.button("Refresh now", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
-    st.caption("Figures update automatically every 15 minutes; use Refresh to pull the latest now.")
+    st.caption("The view refreshes every 5 minutes and the data pipeline updates every 15 "
+               "minutes; use Refresh to pull the latest now.")
     return pf, basis, confidence, significance
 
 
