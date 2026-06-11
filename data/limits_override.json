@@ -1,0 +1,12 @@
+{
+  "gross": {
+    "remaining_day_eur": 10000.0,
+    "rolling_window_eur": 10000.0,
+    "per_mtu_eur": 500.0
+  },
+  "spread": {
+    "remaining_day_eur": 10000.0,
+    "rolling_window_eur": 5000.0,
+    "per_mtu_eur": 400.0
+  }
+}
