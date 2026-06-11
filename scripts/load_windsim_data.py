@@ -127,7 +127,7 @@ def main() -> None:
     db_path = Path(args.db)
     portfolio_name = args.portfolio_name or f"{args.area} Wind"
 
-    ensure_windsim_db(db_path, args.days, args.seed, args.regen)
+    ensure_windsim_db(db_path, args.days, args.seed, args.regen, args.start)
 
     print(f"\nExporting windsim portfolio '{args.windsim_portfolio}' -> client CSVs ({args.area}):")
     files = build_csvs(db_path, args.windsim_portfolio, args.area)
