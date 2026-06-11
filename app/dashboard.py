@@ -529,40 +529,95 @@ def render_curve(df: pd.DataFrame, ov: dict | None, basis: str) -> None:
 
 
 def render_backtest(bt: dict, basis: str) -> None:
-    section(f"Backtest: {basis.capitalize()} IaR vs realised cost (Kupiec POF)")
+    section(f"Backtest: {basis.capitalize()} IaR versus realised cost")
     periods = bt.get("periods", pd.DataFrame())
     if periods is None or periods.empty:
-        st.info("No settled periods to show yet.")
+        st.info("No settled periods to show yet. The backtest compares each delivered day's "
+                "realised cost against the day-ahead IaR estimate, and fills in as days settle.")
         return
-    c = st.columns(5)
-    c[0].metric("Periods", bt["n_periods"])
-    c[1].metric("Exceedances", bt["n_exceedances"])
-    c[2].metric("Observed rate", pct(bt["observed_rate"]))
-    c[3].metric("Expected rate", pct(bt["expected_rate"]))
-    p = bt["kupiec_p_value"]
-    c[4].metric("Kupiec p-value", "n/a" if p is None else f"{p:.3f}")
-    cal = bt["well_calibrated"]
-    if cal is None:
-        st.caption("Calibration verdict unavailable (no observations).")
-    elif cal:
-        st.success("Kupiec POF: calibration not rejected. Exceedance rate is consistent with "
-                   "the confidence level.")
-    else:
-        st.warning("Kupiec POF: calibration rejected. Observed exceedances are inconsistent with "
-                   "the model (note: low power on short windows).")
 
+    obs, exp = bt["observed_rate"], bt["expected_rate"]
+    p, lr = bt["kupiec_p_value"], bt.get("kupiec_lr")
+    cal = bt["well_calibrated"]
+
+    cards = [
+        kpi_card("Settled periods", str(bt["n_periods"]),
+                 "Delivery days compared", show_chip=False),
+        kpi_card("Exceedances", str(bt["n_exceedances"]),
+                 "Days the realised cost exceeded the estimate", show_chip=False),
+        kpi_card("Observed exceedance rate", pct(obs),
+                 f"Expected about {pct(exp)}", show_chip=False),
+        kpi_card("Kupiec p-value", "n/a" if p is None else f"{p:.3f}",
+                 "Likelihood ratio " + ("n/a" if lr is None else f"{lr:.2f}"), show_chip=False),
+    ]
+    for col, html in zip(st.columns(4), cards):
+        col.markdown(html, unsafe_allow_html=True)
+
+    if cal is None:
+        vcol, vtext = MUTED, "Calibration verdict unavailable; there are no settled observations."
+    elif cal:
+        vcol, vtext = (OK_GREEN, "Calibration is not rejected. The observed exceedance rate is "
+                       "consistent with the confidence level at the chosen significance.")
+    else:
+        vcol, vtext = (WARN_AMBER, "Calibration is rejected. The observed exceedances are "
+                       "inconsistent with the model. The test has low power over short windows, "
+                       "so treat this as an indicator rather than a verdict.")
+    st.markdown(
+        f"<div class='u-callout' style='border-left-color:{vcol};background:{vcol}12'>"
+        f"<b>Kupiec proportion-of-failures test.</b> {vtext}</div>",
+        unsafe_allow_html=True,
+    )
+
+    st.divider()
+    section("Realised cost versus IaR estimate")
     fig = go.Figure()
     fig.add_bar(x=periods["period"], y=periods["realised_cost"], name="Realised cost",
                 marker_color=[BREACH_RED if e else "#9aa0a6" for e in periods["exceeded"]],
                 marker_line_width=0)
     fig.add_trace(go.Scatter(x=periods["period"], y=periods["iar_estimate"], name="IaR estimate",
-                             mode="lines+markers", line=dict(color=VOLUE_ORANGE, width=2.5)))
+                             mode="lines+markers", line=dict(color=VOLUE_ORANGE, width=2.5),
+                             marker=dict(size=6)))
     _style_fig(fig)
-    fig.update_layout(height=320)
+    fig.update_layout(height=360)
     fig.update_yaxes(title_text="EUR (positive = cost)")
+    fig.update_xaxes(title_text="Delivery day (Norway time)")
     st.plotly_chart(fig, use_container_width=True)
-    with st.expander("Per-period detail"):
-        st.dataframe(periods, use_container_width=True, hide_index=True)
+    st.caption("Grey bars are within the estimate; red bars are exceedances where the realised "
+               "cost was worse than the day-ahead IaR. The orange line is that IaR estimate.")
+
+    st.divider()
+    section("Cumulative exceedances versus expected")
+    n = len(periods)
+    cum = periods["exceeded"].astype(int).cumsum().tolist()
+    expected_line = [exp * (k + 1) for k in range(n)]
+    fig2 = go.Figure()
+    fig2.add_trace(go.Scatter(x=periods["period"], y=cum, name="Actual (cumulative)",
+                              mode="lines+markers", marker=dict(size=6),
+                              line=dict(color=VOLUE_ORANGE, width=2.5, shape="hv")))
+    fig2.add_trace(go.Scatter(x=periods["period"], y=expected_line, name=f"Expected at {pct(exp)}",
+                              mode="lines", line=dict(color="#9aa0a6", width=1.8, dash="dash")))
+    _style_fig(fig2)
+    fig2.update_layout(height=320)
+    fig2.update_yaxes(title_text="Exceedances")
+    fig2.update_xaxes(title_text="Delivery day (Norway time)")
+    st.plotly_chart(fig2, use_container_width=True)
+    st.caption("When the model is well calibrated the actual breach count tracks the expected "
+               "line. Sustained divergence above the line indicates the IaR is set too low.")
+
+    st.divider()
+    section("Per-period detail")
+    st.dataframe(
+        periods, hide_index=True, use_container_width=True,
+        column_config={
+            "period": st.column_config.TextColumn("Delivery day"),
+            "iar_estimate": st.column_config.NumberColumn("IaR estimate (EUR)", format="%.0f"),
+            "realised_cost": st.column_config.NumberColumn("Realised cost (EUR)", format="%.0f"),
+            "exceeded": st.column_config.CheckboxColumn("Exceeded"),
+        },
+    )
+    st.caption("Each day is compared against the most recent IaR estimate whose vintage precedes "
+               "the delivery day, so only information available beforehand is used. The Gross or "
+               "Spread basis and the significance level are set in the Settings tab.")
 
 
 _ICONS = {
