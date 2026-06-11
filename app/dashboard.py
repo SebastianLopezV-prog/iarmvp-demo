@@ -785,6 +785,9 @@ def main() -> None:
             render_backtest(r_backtest(kind, pid, basis, significance), basis)
         _historical()
 
+    with tabs[3]:
+        render_usage()
+
 
 if __name__ == "__main__":
     main()
