@@ -236,31 +236,69 @@ def render_intraday(df: pd.DataFrame, basis: str) -> None:
     st.plotly_chart(fig, use_container_width=True)
 
 
-def render_heatmap(df: pd.DataFrame, basis: str) -> None:
-    st.markdown(f"##### MTU Risk Heatmap — {basis.capitalize()} IaR intensity (Norway time)")
-    if df.empty:
-        st.info("No per-MTU series for this run.", icon="ℹ️")
-        return
-    # Always render a full 24h × 4-quarter clock-face; MTUs the run didn't cover
-    # (already-settled morning, or beyond the forecast horizon) stay grey.
-    grid = (
-        df.pivot_table(index="quarter", columns="hour", values="iar", aggfunc="mean")
+def _heat_grid(df: pd.DataFrame, value_col: str):
+    """Pivot a tidy [hour, quarter, value] frame to a full 24h × 4-quarter grid."""
+    return (
+        df.pivot_table(index="quarter", columns="hour", values=value_col, aggfunc="mean")
         .reindex(index=[0, 15, 30, 45], columns=list(range(24)))
     )
+
+
+def _heat_figure(grid, *, colorscale, colorbar_title, zmid=None, zabs=False):
+    z = grid.values
+    kw = {}
+    if zabs:  # diverging scale centred on 0 (realised: revenue<0 vs cost>0)
+        m = float(np.nanmax(np.abs(z))) if np.isfinite(np.nanmax(np.abs(z))) else 1.0
+        kw = {"zmin": -m, "zmax": m, "zmid": 0.0}
+    elif zmid is not None:
+        kw["zmid"] = zmid
     fig = go.Figure(
         go.Heatmap(
-            z=grid.values, x=[f"{h:02d}" for h in grid.columns],
-            y=[f":{q:02d}" for q in grid.index],
-            colorscale=[[0, "#FFF6EE"], [0.5, VOLUE_ORANGE], [1, BREACH_RED]],
-            colorbar=dict(title="€"), hoverongaps=False,
-            xgap=1, ygap=1,
+            z=z, x=[f"{h:02d}" for h in grid.columns], y=[f":{q:02d}" for q in grid.index],
+            colorscale=colorscale, colorbar=dict(title=colorbar_title),
+            hoverongaps=False, xgap=1, ygap=1, **kw,
         )
     )
-    fig.update_layout(height=240, margin=dict(l=10, r=10, t=10, b=10),
+    fig.update_layout(height=220, margin=dict(l=10, r=10, t=10, b=10),
                       xaxis_title="Hour of day (00–23, Norway time)", yaxis_title="Quarter",
-                      plot_bgcolor="#e9e9ec")  # grey shows through for un-simulated MTUs
+                      plot_bgcolor="#e9e9ec")  # grey = MTU with no data on this basis
     fig.update_xaxes(dtick=1)
-    st.plotly_chart(fig, use_container_width=True)
+    return fig
+
+
+def render_heatmaps(df: pd.DataFrame, basis: str) -> None:
+    """Two separate heatmaps — forecast worst-case IaR and realised cost.
+
+    They are different metrics (a P95 risk bound vs a single settled outcome) so they
+    each get their own colour scale and are never compared on one. Forecast fills the
+    forward MTUs; realised fills the settled ones; the empty halves are expected.
+    """
+    if df.empty or "forecast_iar" not in df.columns:
+        st.info("No per-MTU series for this run.", icon="ℹ️")
+        return
+
+    st.markdown(f"##### Forecast IaR heatmap — {basis.capitalize()} P95 worst-case (Norway time)")
+    st.caption("The 95th-percentile worst-case cost per MTU (a risk bound). Forward MTUs only — "
+               "the past isn't forecast.")
+    fc = _heat_grid(df, "forecast_iar")
+    st.plotly_chart(
+        _heat_figure(fc, colorscale=[[0, "#FFF6EE"], [0.5, VOLUE_ORANGE], [1, BREACH_RED]],
+                     colorbar_title="€ IaR"),
+        use_container_width=True,
+    )
+
+    st.markdown(f"##### Realised cost heatmap — {basis.capitalize()} settled outcome (Norway time)")
+    rl = _heat_grid(df, "realised_iar")
+    if not np.isfinite(np.nanmax(np.abs(rl.values))):
+        st.info("No settled realised cost for this day yet — imbalance prices publish with a "
+                "delay, so this fills in as the day settles.", icon="ℹ️")
+        return
+    st.caption("Actual cost per MTU once settled (one realised outcome, not a worst case). "
+               "Blue = net revenue, red = net cost — its own scale.")
+    st.plotly_chart(
+        _heat_figure(rl, colorscale="RdBu_r", colorbar_title="€ cost", zabs=True),
+        use_container_width=True,
+    )
 
 
 def render_limit_table(df: pd.DataFrame) -> None:
