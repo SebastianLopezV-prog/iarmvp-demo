@@ -228,6 +228,7 @@ def render_intraday(df: pd.DataFrame, basis: str) -> None:
     )
     fig.update_yaxes(title_text=f"{basis.capitalize()} IaR (€)", secondary_y=False)
     fig.update_yaxes(title_text="Position (MWh)", secondary_y=True, showgrid=False)
+    fig.update_xaxes(title_text="Time (Norway, CET/CEST)")
     st.plotly_chart(fig, use_container_width=True)
 
 
