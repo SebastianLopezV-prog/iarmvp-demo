@@ -430,7 +430,7 @@ def render_alerts(df: pd.DataFrame) -> None:
 def render_curve(df: pd.DataFrame, ov: dict | None, basis: str) -> None:
     section(f"{basis.capitalize()} IaR over time (per vintage) vs limit")
     if df.empty:
-        st.info("No stored runs to chart yet. The scheduled pipeline populates this over time.")
+        st.info("No history to chart yet.")
         return
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=df["vintage_ts"], y=df["iar_value"], name="IaR",
