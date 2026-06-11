@@ -351,57 +351,71 @@ def render_backtest(bt: dict, basis: str) -> None:
 # --------------------------------------------------------------------------- #
 # Main
 # --------------------------------------------------------------------------- #
+def render_settings(kind: str):
+    """Render the controls (in the Settings tab) and return the chosen selections.
+
+    Defined and called *before* the other tabs so their selected values are
+    available when those tabs render (Streamlit executes every tab body each run).
+    """
+    st.markdown("#### Controls")
+    try:
+        pfs = r_portfolios(kind)
+    except Exception as exc:  # noqa: BLE001 — surface DB/import issues gracefully
+        st.error(f"Could not load portfolios from the database: {exc}")
+        st.stop()
+    if pfs.empty:
+        st.warning("No portfolios found. Seed them with `scripts/seed_demo.py` and run "
+                   "`scripts/run_iar.py --store`.")
+        st.stop()
+
+    labels = [f"{r['price_area']} · {r['name']}" for _, r in pfs.iterrows()]
+    idx = st.selectbox("Portfolio", range(len(labels)), format_func=lambda i: labels[i])
+    pf = pfs.iloc[idx].to_dict()
+
+    basis = st.radio("IaR basis", ["gross", "spread"], horizontal=True, format_func=str.capitalize)
+    confidence = st.select_slider("Confidence (α)", options=[0.90, 0.95, 0.99], value=0.95,
+                                  format_func=lambda c: f"{c:.0%}  (α={1 - c:.2f})")
+    significance = st.select_slider("Kupiec significance", options=[0.01, 0.05, 0.10], value=0.05)
+    if st.button("↻ Refresh data", use_container_width=True):
+        st.cache_data.clear()
+        st.rerun()
+
+    st.divider()
+    st.caption(
+        "Data is read live from the SQLite database via `iar.service` — the dashboard "
+        "never calls Optimeering or the markets SDK directly. The pipeline (live feeds → "
+        "DB) is run by the backend scripts:"
+    )
+    st.code("python scripts/run_iar.py --area NO2 --store\n"
+            "python scripts/backfill_iar.py --area NO2 --start=-P5D --end=P0D\n"
+            "python scripts/run_backtest.py --area NO2", language="bash")
+    st.caption("Confidence (α) is the level the stored run was computed at; changing it here "
+               "drives the backtest target — re-run the pipeline to re-estimate at a new α.")
+    return pf, basis, confidence, significance
+
+
 def main() -> None:
     st.set_page_config(page_title="Imbalance at Risk", page_icon="⚡", layout="wide")
     st.markdown(_CSS, unsafe_allow_html=True)
+    kind = "live"
 
-    # --- sidebar: the source swap point + selectors --------------------- #
-    with st.sidebar:
-        st.markdown("### ⚡ IaR Controls")
-        src_label = st.radio(
-            "Data source", ["Live (database)", "Demo (synthetic)"], index=0,
-            help="Live = real pipeline output via iar.service (SQLite); fed by the backend "
-                 "scripts (run_iar.py etc.), never the UI. Demo = self-contained synthetic "
-                 "feed (no DB/key/network) for a swap-in demo.",
-        )
-        kind = "live" if src_label.startswith("Live") else "demo"
-        if st.button("↻ Refresh data", use_container_width=True):
-            st.cache_data.clear()
+    header_box = st.container()  # filled after we know the selection (renders above tabs)
+    tabs = st.tabs(["⊞ Command Centre", "📈 Risk Analytics", "🗓 Historical", "⚙ Settings"])
 
-        try:
-            pfs = r_portfolios(kind)
-        except Exception as exc:  # noqa: BLE001 — surface DB/import issues gracefully
-            st.error(f"Could not load portfolios from the {kind} source: {exc}")
-            st.stop()
-        if pfs.empty:
-            st.warning("No portfolios found. Seed them with `scripts/seed_demo.py`.")
-            st.stop()
-
-        labels = [f"{r['price_area']} · {r['name']}" for _, r in pfs.iterrows()]
-        idx = st.selectbox("Portfolio", range(len(labels)), format_func=lambda i: labels[i])
-        pf = pfs.iloc[idx].to_dict()
-        pid = int(pf["portfolio_id"])
-
-        confidence = st.select_slider("Confidence (α)", options=[0.90, 0.95, 0.99], value=0.95,
-                                      format_func=lambda c: f"{c:.0%}  (α={1 - c:.2f})")
-        basis = st.radio("IaR basis", ["gross", "spread"], horizontal=True,
-                         format_func=str.capitalize)
-        significance = st.select_slider("Kupiec significance", options=[0.01, 0.05, 0.10],
-                                        value=0.05)
-        st.caption("UI reads only via the DataSource seam — no live feeds here.")
+    # Settings first (in code) so the selections drive the other tabs.
+    with tabs[3]:
+        pf, basis, confidence, significance = render_settings(kind)
+    pid = int(pf["portfolio_id"])
 
     ov = r_overview(kind, pid, confidence)
-    render_header(pf, ov, kind)
-
-    tabs = st.tabs(["⊞ Command Centre", "📈 Risk Analytics", "🗓 Historical",
-                    "🔬 Scenario Explorer", "🛡 Limit Manager"])
+    with header_box:
+        render_header(pf, ov, kind)
 
     # --- Command Centre -------------------------------------------------- #
     with tabs[0]:
         if ov is None:
             st.info("No simulation run stored for this portfolio yet. Run "
-                    "`scripts/run_iar.py --store` for it, or switch to the Demo source.",
-                    icon="ℹ️")
+                    "`scripts/run_iar.py --area " + pf["price_area"] + " --store`.", icon="ℹ️")
         else:
             render_kpis(ov)
             st.divider()
@@ -417,20 +431,11 @@ def main() -> None:
     # --- Risk Analytics (IaR curve vs limit) ----------------------------- #
     with tabs[1]:
         render_curve(r_curve(kind, pid, basis), ov, basis)
-        st.caption("Gross/Spread toggle and confidence are in the sidebar.")
+        st.caption("Portfolio, Gross/Spread basis and confidence are in the Settings tab.")
 
     # --- Historical (backtest) ------------------------------------------- #
     with tabs[2]:
         render_backtest(r_backtest(kind, pid, basis, significance), basis)
-
-    # --- Not yet built (match the target nav; build in later iterations) - #
-    with tabs[3]:
-        st.info("**Scenario Explorer** — interactive P&L distribution, scenario drill-down "
-                "and stress shifts. Planned for a later iteration.", icon="🚧")
-    with tabs[4]:
-        st.info("**Limit Manager** — edit per-portfolio euro-limits and soft/hard ratios. "
-                "Limits currently live in `config/limits.toml`. Planned for a later iteration.",
-                icon="🚧")
 
 
 if __name__ == "__main__":
