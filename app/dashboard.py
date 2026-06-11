@@ -1,11 +1,9 @@
-"""Streamlit dashboard (Task 4.1) — UI only, source-agnostic.
+"""Streamlit dashboard (Task 4.1): UI only, source-agnostic.
 
-The Imbalance-at-Risk **Command Centre**. This module contains *no* simulation,
+The Imbalance-at-Risk Command Centre. This module contains no simulation,
 database or API logic: it talks exclusively to a :class:`~data_source.DataSource`
-(see ``app/data_source.py``), so the same UI renders either the real pipeline
-output (``ServiceDataSource`` → ``iar.service`` → SQLite) or a fully synthetic
-demo feed (``DemoDataSource``). Flip the source in the sidebar — nothing else
-changes. **Live feeds (Optimeering / markets SDK) are never imported here.**
+(see ``app/data_source.py``), which reads only the SQLite database. Live feeds
+(Optimeering / markets SDK) are never imported here.
 
 Run:  ``streamlit run app/dashboard.py``
 """
@@ -17,6 +15,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import plotly.colors as pcolors
 import plotly.graph_objects as go
 import streamlit as st
 import streamlit.components.v1 as components
@@ -34,51 +33,81 @@ from data_source import get_data_source  # noqa: E402
 # Theme
 # --------------------------------------------------------------------------- #
 VOLUE_ORANGE = "#FF5C39"
-INK = "#10141C"
+INK = "#141821"
+TEAL = "#1FA8A0"
+MUTED = "#6b7280"
 OK_GREEN = "#1f9d57"
-WARN_AMBER = "#E69500"
+WARN_AMBER = "#E08A00"
 BREACH_RED = "#D8453B"
+FONT = "Inter, 'Segoe UI', system-ui, -apple-system, sans-serif"
 
-#: (emoji, label, colour) per severity. ``None`` ⇒ within limit.
+#: (label, colour) per severity. ``None`` => within limit.
 SEVERITY = {
-    "hard": ("🔴", "Breach", BREACH_RED),
-    "soft": ("🟠", "Approaching limit", WARN_AMBER),
-    None: ("🟢", "Within limit", OK_GREEN),
+    "hard": ("Breach", BREACH_RED),
+    "soft": ("Approaching limit", WARN_AMBER),
+    None: ("Within limit", OK_GREEN),
 }
 
 _CSS = f"""
 <style>
-  .block-container {{ padding-top: 1.2rem; max-width: 1500px; }}
+  html, body, [class*="css"] {{ font-family: {FONT}; }}
+  [data-testid="stAppViewContainer"] {{ background: #f5f6f8; }}
+  .block-container {{ padding-top: 1.1rem; padding-bottom: 3rem; max-width: 1500px; }}
+
   .volue-bar {{
-      background: {INK}; color: #fff; border-radius: 8px;
-      padding: 12px 18px; margin-bottom: 4px;
+      background: linear-gradient(100deg, {INK} 0%, #1d2533 100%); color: #fff;
+      border-radius: 14px; padding: 16px 22px; margin-bottom: 14px;
+      box-shadow: 0 6px 20px rgba(20,24,33,.18);
       border-bottom: 3px solid {VOLUE_ORANGE};
       display: flex; justify-content: space-between; align-items: center;
   }}
-  .volue-bar .brand {{ font-weight: 800; letter-spacing: 3px; }}
+  .volue-bar .brand {{ font-weight: 800; letter-spacing: 4px; font-size: 1.05rem; }}
   .volue-bar .brand span {{ color: {VOLUE_ORANGE}; }}
-  .volue-bar .meta {{ font-size: 0.85rem; opacity: 0.85; }}
+  .volue-bar .title {{ font-weight: 600; letter-spacing: 0; opacity: .9; margin-left: 12px; }}
+  .volue-bar .meta {{ font-size: 0.82rem; opacity: 0.82; text-align: right; }}
+  .volue-bar .tag {{ background: {VOLUE_ORANGE}; color: #fff; border-radius: 6px;
+                     padding: 1px 7px; font-weight: 700; font-size: .72rem; letter-spacing: 1px; }}
+
+  .sec {{ font-size: 0.74rem; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase;
+          color: {MUTED}; margin: 6px 0 8px; }}
+
   .kpi {{
-      border: 1px solid #e7e7ea; border-top: 4px solid #ccc;
-      border-radius: 8px; padding: 12px 14px; background: #fff; height: 100%;
+      border: 1px solid #ebedf0; border-top: 3px solid #d7dade;
+      border-radius: 14px; padding: 16px 18px; background: #fff; height: 100%;
+      box-shadow: 0 2px 10px rgba(20,24,33,.05);
   }}
-  .kpi .lbl {{ font-size: 0.68rem; letter-spacing: 0.3px; color: #6b7280;
-               text-transform: uppercase; min-height: 2.4em; line-height: 1.2; }}
-  .kpi .val {{ font-size: 1.55rem; font-weight: 800; color: {INK}; line-height: 1.15;
-               white-space: nowrap; margin-top: 4px; }}
-  .kpi .sub {{ font-size: 0.78rem; color: #6b7280; margin-top: 4px; min-height: 2.4em; }}
-  .chip {{ display: inline-block; padding: 2px 9px; border-radius: 999px;
-           font-size: 0.74rem; font-weight: 600; margin-top: 8px; }}
-  .feed {{ border-left: 3px solid #ccc; padding: 6px 10px; margin-bottom: 8px; background: #fafafa; }}
-  .feed .ttl {{ font-weight: 600; font-size: 0.86rem; }}
-  .feed .bdy {{ font-size: 0.8rem; color: #555; }}
-  .feed .tms {{ font-size: 0.72rem; color: #999; }}
+  .kpi .lbl {{ font-size: 0.68rem; letter-spacing: .4px; color: {MUTED};
+               text-transform: uppercase; min-height: 2.4em; line-height: 1.25; }}
+  .kpi .val {{ font-size: 1.7rem; font-weight: 800; color: {INK}; line-height: 1.1;
+               white-space: nowrap; margin-top: 6px; }}
+  .kpi .sub {{ font-size: 0.78rem; color: {MUTED}; margin-top: 6px; min-height: 2.2em; }}
+
+  .dot {{ display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+          margin-right: 6px; vertical-align: middle; }}
+  .chip {{ display: inline-block; padding: 3px 11px; border-radius: 999px;
+           font-size: 0.74rem; font-weight: 600; }}
+
+  table.lim {{ width: 100%; border-collapse: collapse; }}
+  table.lim th {{ text-align: left; color: {MUTED}; font-size: 0.72rem; font-weight: 700;
+                  text-transform: uppercase; letter-spacing: .4px; padding: 0 8px 8px; }}
+  table.lim td {{ padding: 9px 8px; border-top: 1px solid #eef0f2; font-size: 0.86rem; }}
+
+  .feed {{ border-left: 3px solid #d7dade; padding: 8px 12px; margin-bottom: 9px;
+           background: #fff; border-radius: 0 10px 10px 0; box-shadow: 0 1px 6px rgba(20,24,33,.04); }}
+  .feed .ttl {{ font-weight: 600; font-size: 0.86rem; color: {INK}; }}
+  .feed .bdy {{ font-size: 0.8rem; color: #555; margin-top: 1px; }}
+  .feed .tms {{ font-size: 0.72rem; color: #9aa0a6; }}
+
+  div[data-testid="stPlotlyChart"] {{ background: #fff; border: 1px solid #ebedf0;
+       border-radius: 14px; padding: 8px 6px; box-shadow: 0 2px 10px rgba(20,24,33,.05); }}
+  .stTabs [data-baseweb="tab-list"] {{ gap: 4px; }}
+  .stTabs [data-baseweb="tab"] {{ font-weight: 600; }}
 </style>
 """
 
 
 # --------------------------------------------------------------------------- #
-# Cached reads (keyed by the source *kind* string, so swapping is transparent)
+# Cached reads (keyed by the source *kind* string)
 # --------------------------------------------------------------------------- #
 @st.cache_data(ttl=30, show_spinner=False)
 def r_portfolios(kind: str) -> pd.DataFrame:
@@ -121,22 +150,40 @@ def r_backtest(kind: str, pid: int, basis: str, significance: float) -> dict:
 
 
 # --------------------------------------------------------------------------- #
-# Small formatters
+# Formatters / small helpers
 # --------------------------------------------------------------------------- #
 def eur(x, signed: bool = False) -> str:
     if x is None or (isinstance(x, float) and pd.isna(x)):
-        return "—"
-    return f"€{x:+,.0f}" if signed else f"€{x:,.0f}"
+        return "n/a"
+    return f"EUR {x:+,.0f}" if signed else f"EUR {x:,.0f}"
 
 
 def pct(x) -> str:
-    return "—" if x is None or pd.isna(x) else f"{x:.0%}"
+    return "n/a" if x is None or pd.isna(x) else f"{x:.0%}"
 
 
 def fmt_ts(ts) -> str:
     if ts is None or pd.isna(ts):
-        return "—"
+        return "n/a"
     return pd.to_datetime(ts).strftime("%Y-%m-%d %H:%M")
+
+
+def section(title: str) -> None:
+    st.markdown(f"<div class='sec'>{title}</div>", unsafe_allow_html=True)
+
+
+def _style_fig(fig: go.Figure) -> go.Figure:
+    """Apply the shared chart look: clean font, transparent bg, soft gridlines."""
+    fig.update_layout(
+        font=dict(family=FONT, size=12, color="#374151"),
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+        margin=dict(l=12, r=12, t=12, b=10),
+        legend=dict(orientation="h", y=1.14, x=0, font=dict(size=11)),
+        hoverlabel=dict(font_size=12),
+    )
+    fig.update_xaxes(showgrid=False, zeroline=False, linecolor="#e5e7eb")
+    fig.update_yaxes(showgrid=True, gridcolor="#f0f1f4", zeroline=False)
+    return fig
 
 
 # --------------------------------------------------------------------------- #
@@ -147,192 +194,220 @@ def render_header(pf: dict, ov: dict | None, kind: str) -> None:
     warn = ""
     if ov and (ov["n_warnings"] or ov["n_breaches"]):
         n = ov["n_warnings"] + ov["n_breaches"]
-        warn = f" &nbsp;·&nbsp; <span style='color:{WARN_AMBER}'>⚠ {n} active warning(s)</span>"
+        warn = (f" &nbsp;&middot;&nbsp; <span class='dot' style='background:{WARN_AMBER}'></span>"
+                f"<span style='color:#f3c98b'>{n} active warning(s)</span>")
     tag = "LIVE" if kind == "live" else "DEMO"
     st.markdown(
         f"""
         <div class="volue-bar">
-          <div class="brand">VOL<span>U</span>E &nbsp; <span style="color:#fff;font-weight:600;
-               letter-spacing:0;">Imbalance at Risk</span></div>
-          <div class="meta">{pf['name']} &nbsp;·&nbsp; Area {pf['price_area']}
-               &nbsp;·&nbsp; <b>{tag}</b> · as of {as_of} (Norway){warn}</div>
+          <div><span class="brand">VOL<span>U</span>E</span>
+               <span class="title">Imbalance at Risk</span></div>
+          <div class="meta">{pf['name']} &nbsp;&middot;&nbsp; Area {pf['price_area']}
+               &nbsp;&middot;&nbsp; <span class="tag">{tag}</span>
+               &nbsp; as of {as_of} (Norway){warn}</div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
 
-def kpi_card(label: str, value: str, sub: str, severity) -> str:
-    emoji, text, colour = SEVERITY.get(severity, SEVERITY[None])
+def kpi_card(label: str, value: str, sub: str, severity=None, show_chip: bool = True) -> str:
+    text, colour = SEVERITY.get(severity, SEVERITY[None])
+    top = colour if show_chip else "#d7dade"
+    chip = (f"<div class='chip' style='background:{colour}1A;color:{colour}'>"
+            f"<span class='dot' style='background:{colour}'></span>{text}</div>") if show_chip else ""
     return f"""
-      <div class="kpi" style="border-top-color:{colour}">
+      <div class="kpi" style="border-top-color:{top}">
         <div class="lbl">{label}</div>
         <div class="val">{value}</div>
         <div class="sub">{sub}</div>
-        <div class="chip" style="background:{colour}20;color:{colour}">{emoji} {text}</div>
+        {chip}
       </div>"""
 
 
 def render_kpis(ov: dict) -> None:
     g, s = ov["gross"], ov["spread"]
     cards = [
-        kpi_card(
-            "Period Gross IaR — Remaining day", eur(g["period_iar"]),
-            f"Limit {eur(g['limit'])} · {pct(g['utilisation'])} utilised", g["severity"],
-        ),
-        kpi_card(
-            "Period Spread IaR — Remaining day", eur(s["period_iar"]),
-            f"Limit {eur(s['limit'])} · {pct(s['utilisation'])} utilised", s["severity"],
-        ),
-        kpi_card(
-            "Peak MTU Gross IaR",
-            eur(g["peak_mtu_iar"]) if g["peak_mtu_iar"] is not None else "n/a",
-            "Worst single 15-min MTU" if g["peak_mtu_iar"] is not None
-            else "engine emits period IaR only", None if g["peak_mtu_iar"] is not None else None,
-        ),
-        kpi_card(
-            "Overperformance ratio",
-            f"{ov['overperformance_ratio']:.2f}" if ov["overperformance_ratio"] is not None else "n/a",
-            "Net benefit vs naive sum of MTU IaRs" if ov["overperformance_ratio"] is not None
-            else "not available from this source", None,
-        ),
+        kpi_card("Period Gross IaR, remaining day", eur(g["period_iar"]),
+                 f"Limit {eur(g['limit'])} &middot; {pct(g['utilisation'])} utilised", g["severity"]),
+        kpi_card("Period Spread IaR, remaining day", eur(s["period_iar"]),
+                 f"Limit {eur(s['limit'])} &middot; {pct(s['utilisation'])} utilised", s["severity"]),
+        kpi_card("Peak MTU Gross IaR",
+                 eur(g["peak_mtu_iar"]) if g["peak_mtu_iar"] is not None else "n/a",
+                 "Worst single 15-min MTU", show_chip=False),
+        kpi_card("Overperformance ratio",
+                 f"{ov['overperformance_ratio']:.2f}" if ov["overperformance_ratio"] is not None else "n/a",
+                 "Period IaR vs naive sum of MTU IaRs", show_chip=False),
     ]
     for col, html in zip(st.columns(4), cards):
         col.markdown(html, unsafe_allow_html=True)
 
 
 def render_intraday(df: pd.DataFrame, basis: str) -> None:
-    st.markdown("##### Intraday IaR — 15-min MTUs")
+    section("Intraday IaR (15-min MTUs)")
     if df.empty:
-        st.info(
-            "No per-MTU IaR series from this source. The MVP engine emits a single "
-            "**period** IaR (not a per-MTU series) — switch to the **Demo** source to "
-            "preview this panel, or see `docs/assumptions.md`.",
-            icon="ℹ️",
-        )
+        st.info("No per-MTU series for this run yet.")
         return
     fig = make_subplots(specs=[[{"secondary_y": True}]])
     colours = [VOLUE_ORANGE if not p else "#F2C9B8" for p in df["is_past"]]
     fig.add_bar(x=df["timestamp"], y=df["forecast_iar"], name="Forecast IaR",
-                marker_color=colours, opacity=0.9)
+                marker_color=colours, marker_line_width=0)
     if df["realised_iar"].notna().any():
-        fig.add_bar(x=df["timestamp"], y=df["realised_iar"], name="Realised IaR",
-                    marker_color="#9aa0a6", opacity=0.65)
+        fig.add_bar(x=df["timestamp"], y=df["realised_iar"], name="Realised cost",
+                    marker_color="#9aa0a6", opacity=0.7, marker_line_width=0)
     fig.add_trace(
         go.Scatter(x=df["timestamp"], y=df["position_mwh"], name="Position (MWh)",
-                   line=dict(color="#2a9d8f", width=2)),
+                   line=dict(color=TEAL, width=2)),
         secondary_y=True,
     )
     mtu_limit = float(df["mtu_limit"].iloc[0])
     if pd.notna(mtu_limit):
         fig.add_hline(y=mtu_limit, line=dict(color=BREACH_RED, dash="dash"),
                       annotation_text="MTU limit", annotation_position="top left")
-    fig.update_layout(
-        barmode="overlay", height=340, margin=dict(l=10, r=10, t=10, b=10),
-        legend=dict(orientation="h", y=1.12), bargap=0.15,
-    )
-    fig.update_yaxes(title_text=f"{basis.capitalize()} IaR (€)", secondary_y=False)
+    _style_fig(fig)
+    fig.update_layout(barmode="overlay", height=340, bargap=0.2)
+    fig.update_yaxes(title_text=f"{basis.capitalize()} IaR (EUR)", secondary_y=False)
     fig.update_yaxes(title_text="Position (MWh)", secondary_y=True, showgrid=False)
     fig.update_xaxes(title_text="Time (Norway, CET/CEST)")
     st.plotly_chart(fig, use_container_width=True)
 
 
 def _heat_grid(df: pd.DataFrame, value_col: str):
-    """Pivot a tidy [hour, quarter, value] frame to a full 24h × 4-quarter grid."""
+    """Pivot a tidy [hour, quarter, value] frame to a full 24h x 4-quarter grid."""
     return (
         df.pivot_table(index="quarter", columns="hour", values=value_col, aggfunc="mean")
         .reindex(index=[0, 15, 30, 45], columns=list(range(24)))
     )
 
 
-def _heat_figure(grid, *, colorscale, colorbar_title, zmid=None, zabs=False):
-    z = grid.values
-    kw = {}
-    if zabs:  # diverging scale centred on 0 (realised: revenue<0 vs cost>0)
-        m = float(np.nanmax(np.abs(z))) if np.isfinite(np.nanmax(np.abs(z))) else 1.0
-        kw = {"zmin": -m, "zmax": m, "zmid": 0.0}
-    elif zmid is not None:
-        kw["zmid"] = zmid
-    fig = go.Figure(
-        go.Heatmap(
-            z=z, x=[f"{h:02d}" for h in grid.columns], y=[f":{q:02d}" for q in grid.index],
-            colorscale=colorscale, colorbar=dict(title=colorbar_title),
-            hoverongaps=False, xgap=1, ygap=1, **kw,
-        )
+def _rounded_heatmap(grid, *, colorscale, colorbar_title: str, diverging: bool = False):
+    """A heatmap drawn as individual rounded-corner cells (one per MTU)."""
+    z = grid.values  # rows = quarters, cols = hours
+    finite = z[np.isfinite(z)]
+    if finite.size == 0:
+        vmin, vmax = 0.0, 1.0
+    elif diverging:
+        m = float(np.nanmax(np.abs(finite))) or 1.0
+        vmin, vmax = -m, m
+    else:
+        vmin, vmax = float(finite.min()), float(finite.max())
+        if vmin == vmax:
+            vmax = vmin + 1.0
+
+    def color_at(v: float) -> str:
+        t = 0.5 if vmax == vmin else min(max((v - vmin) / (vmax - vmin), 0.0), 1.0)
+        return pcolors.sample_colorscale(colorscale, [t])[0]
+
+    quarters, hours = list(grid.index), list(grid.columns)
+    nq = len(quarters)
+    pad, rx, ry = 0.07, 0.17, 0.17
+    fig = go.Figure()
+    hx, hy, ht = [], [], []
+    for qi in range(nq):
+        for hi in range(len(hours)):
+            v = z[qi, hi]
+            if not np.isfinite(v):
+                continue
+            x0, x1, y0, y1 = hi + pad, hi + 1 - pad, qi + pad, qi + 1 - pad
+            path = (
+                f"M {x0 + rx},{y0} L {x1 - rx},{y0} Q {x1},{y0} {x1},{y0 + ry} "
+                f"L {x1},{y1 - ry} Q {x1},{y1} {x1 - rx},{y1} "
+                f"L {x0 + rx},{y1} Q {x0},{y1} {x0},{y1 - ry} "
+                f"L {x0},{y0 + ry} Q {x0},{y0} {x0 + rx},{y0} Z"
+            )
+            fig.add_shape(type="path", path=path, fillcolor=color_at(v),
+                          line=dict(width=0), layer="below")
+            hx.append(hi + 0.5)
+            hy.append(qi + 0.5)
+            ht.append(f"{hours[hi]:02d}:{quarters[qi]:02d}<br>EUR {v:,.0f}")
+    fig.add_trace(go.Scatter(x=hx, y=hy, mode="markers",
+                             marker=dict(size=18, color="rgba(0,0,0,0)"),
+                             hoverinfo="text", text=ht, showlegend=False))
+    # Off-canvas proxy point just to render the colour bar.
+    fig.add_trace(go.Scatter(
+        x=[-5], y=[-5], mode="markers", hoverinfo="skip", showlegend=False,
+        marker=dict(size=6, color=[vmin], colorscale=colorscale, cmin=vmin, cmax=vmax,
+                    showscale=True, colorbar=dict(title=colorbar_title, thickness=12, outlinewidth=0)),
+    ))
+    fig.update_layout(
+        height=230, margin=dict(l=12, r=12, t=8, b=10),
+        font=dict(family=FONT, size=12, color="#374151"),
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
     )
-    fig.update_layout(height=220, margin=dict(l=10, r=10, t=10, b=10),
-                      xaxis_title="Hour of day (00–23, Norway time)", yaxis_title="Quarter",
-                      plot_bgcolor="#e9e9ec")  # grey = MTU with no data on this basis
-    fig.update_xaxes(dtick=1)
+    fig.update_xaxes(range=[-0.2, 24.2], tickvals=[i + 0.5 for i in range(len(hours))],
+                     ticktext=[f"{h:02d}" for h in hours], showgrid=False, zeroline=False,
+                     title_text="Hour of day (00-23, Norway time)")
+    fig.update_yaxes(range=[-0.2, nq + 0.2], tickvals=[i + 0.5 for i in range(nq)],
+                     ticktext=[f":{q:02d}" for q in quarters], showgrid=False, zeroline=False,
+                     title_text="Quarter")
     return fig
 
 
 def render_heatmaps(df: pd.DataFrame, basis: str) -> None:
-    """Two separate heatmaps — forecast worst-case IaR and realised cost.
+    """Two separate heatmaps: forecast worst-case IaR and realised cost.
 
-    They are different metrics (a P95 risk bound vs a single settled outcome) so they
-    each get their own colour scale and are never compared on one. Forecast fills the
-    forward MTUs; realised fills the settled ones; the empty halves are expected.
+    Different metrics (a P95 risk bound vs a single settled outcome), so each gets its
+    own colour scale and they are never compared on one. Forecast fills the forward
+    MTUs; realised fills the settled ones; the empty halves are expected.
     """
     if df.empty or "forecast_iar" not in df.columns:
-        st.info("No per-MTU series for this run.", icon="ℹ️")
+        st.info("No per-MTU series for this run.")
         return
 
-    st.markdown(f"##### Forecast IaR heatmap — {basis.capitalize()} P95 worst-case (Norway time)")
-    st.caption("The 95th-percentile worst-case cost per MTU (a risk bound). Forward MTUs only — "
-               "the past isn't forecast.")
-    fc = _heat_grid(df, "forecast_iar")
+    section(f"Forecast IaR heatmap: {basis.capitalize()} P95 worst-case (Norway time)")
+    st.caption("95th-percentile worst-case cost per MTU (a risk bound). Forward MTUs only; "
+               "the past is not forecast.")
     st.plotly_chart(
-        _heat_figure(fc, colorscale=[[0, "#FFF6EE"], [0.5, VOLUE_ORANGE], [1, BREACH_RED]],
-                     colorbar_title="€ IaR"),
+        _rounded_heatmap(_heat_grid(df, "forecast_iar"),
+                         colorscale=[[0, "#FFF1E8"], [0.5, VOLUE_ORANGE], [1, BREACH_RED]],
+                         colorbar_title="EUR"),
         use_container_width=True,
     )
 
-    st.markdown(f"##### Realised cost heatmap — {basis.capitalize()} settled outcome (Norway time)")
+    section(f"Realised cost heatmap: {basis.capitalize()} settled outcome (Norway time)")
     rl = _heat_grid(df, "realised_iar")
     if not np.isfinite(np.nanmax(np.abs(rl.values))):
-        st.info("No settled realised cost for this day yet — imbalance prices publish with a "
-                "delay, so this fills in as the day settles.", icon="ℹ️")
+        st.info("No settled realised cost for this day yet. Imbalance prices publish with a "
+                "delay, so this fills in as the day settles.")
         return
     st.caption("Actual cost per MTU once settled (one realised outcome, not a worst case). "
-               "Blue = net revenue, red = net cost — its own scale.")
+               "Blue is net revenue, red is net cost, on its own scale.")
     st.plotly_chart(
-        _heat_figure(rl, colorscale="RdBu_r", colorbar_title="€ cost", zabs=True),
+        _rounded_heatmap(rl, colorscale="RdBu_r", colorbar_title="EUR", diverging=True),
         use_container_width=True,
     )
 
 
 def render_limit_table(df: pd.DataFrame) -> None:
-    st.markdown("##### Limit Status")
+    section("Limit status")
     if df.empty:
-        st.info("No limits configured / no run to evaluate.", icon="ℹ️")
+        st.info("No limits configured, or no run to evaluate.")
         return
-    head = ("<tr style='text-align:left;color:#6b7280;font-size:0.78rem'>"
-            "<th>Limit</th><th>Current IaR</th><th>Limit</th><th>Utilisation</th><th>Status</th></tr>")
+    head = ("<tr><th>Limit</th><th>Current IaR</th><th>Limit</th>"
+            "<th>Utilisation</th><th>Status</th></tr>")
     rows = []
     for _, r in df.iterrows():
-        emoji, text, colour = SEVERITY.get(r["severity"], SEVERITY[None])
+        text, colour = SEVERITY.get(r["severity"], SEVERITY[None])
         util = r["utilisation"]
         bar_w = min(max(util, 0.0), 1.0) * 100 if pd.notna(util) else 0
-        bar = (f"<div style='background:#eee;border-radius:4px;height:8px;width:120px'>"
-               f"<div style='background:{colour};height:8px;border-radius:4px;width:{bar_w:.0f}%'></div></div>")
+        bar = (f"<div style='background:#eef0f2;border-radius:5px;height:7px;width:120px'>"
+               f"<div style='background:{colour};height:7px;border-radius:5px;width:{bar_w:.0f}%'></div></div>")
         rows.append(
-            f"<tr style='border-top:1px solid #eee'>"
-            f"<td style='padding:6px 8px'>{r['label']}</td>"
-            f"<td>{eur(r['current_iar'])}</td><td>{eur(r['limit'])}</td>"
-            f"<td>{bar}<span style='font-size:0.74rem;color:#888'>{pct(util)}</span></td>"
-            f"<td><span class='chip' style='background:{colour}20;color:{colour}'>{emoji} {text}</span></td></tr>"
+            f"<tr><td>{r['label']}</td><td>{eur(r['current_iar'])}</td><td>{eur(r['limit'])}</td>"
+            f"<td>{bar}<span style='font-size:0.74rem;color:#9aa0a6'>{pct(util)}</span></td>"
+            f"<td><span class='chip' style='background:{colour}1A;color:{colour}'>"
+            f"<span class='dot' style='background:{colour}'></span>{text}</span></td></tr>"
         )
-    st.markdown(f"<table style='width:100%'>{head}{''.join(rows)}</table>", unsafe_allow_html=True)
+    st.markdown(f"<table class='lim'>{head}{''.join(rows)}</table>", unsafe_allow_html=True)
 
 
 def render_alerts(df: pd.DataFrame) -> None:
-    st.markdown("##### Alert Feed")
+    section("Alert feed")
     if df.empty:
-        st.success("No alerts — all limits respected.", icon="✅")
+        st.success("No alerts. All limits respected.")
         return
     for _, a in df.iterrows():
-        _, _, colour = SEVERITY.get(a["severity"], SEVERITY[None])
+        _, colour = SEVERITY.get(a["severity"], SEVERITY[None])
         st.markdown(
             f"<div class='feed' style='border-left-color:{colour}'>"
             f"<div class='tms'>{fmt_ts(a['ts'])}</div>"
@@ -342,34 +417,34 @@ def render_alerts(df: pd.DataFrame) -> None:
 
 
 def render_curve(df: pd.DataFrame, ov: dict | None, basis: str) -> None:
-    st.markdown(f"##### {basis.capitalize()} IaR over time (per vintage) vs limit")
+    section(f"{basis.capitalize()} IaR over time (per vintage) vs limit")
     if df.empty:
-        st.info("No stored runs to chart. Run `scripts/run_iar.py --store` (and "
-                "`backfill_iar.py` for a series), or switch to the Demo source.", icon="ℹ️")
+        st.info("No stored runs to chart yet. The scheduled pipeline populates this over time.")
         return
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=df["vintage_ts"], y=df["iar_value"], name="IaR",
-                             mode="lines+markers", line=dict(color=VOLUE_ORANGE, width=2)))
+                             mode="lines+markers", line=dict(color=VOLUE_ORANGE, width=2.5),
+                             marker=dict(size=6)))
     if df["ciar_value"].notna().any():
         fig.add_trace(go.Scatter(x=df["vintage_ts"], y=df["ciar_value"], name="CIaR",
-                                 mode="lines", line=dict(color="#888", width=1, dash="dot")))
+                                 mode="lines", line=dict(color="#9aa0a6", width=1.5, dash="dot")))
     limit = ov[basis]["limit"] if ov and ov.get(basis) else None
     if limit:
         fig.add_hline(y=float(limit), line=dict(color=BREACH_RED, dash="dash"),
                       annotation_text="Day limit", annotation_position="top left")
-    fig.update_layout(height=360, margin=dict(l=10, r=10, t=10, b=10),
-                      legend=dict(orientation="h", y=1.1),
-                      yaxis_title="€ (positive = cost)", xaxis_title="Vintage")
+    _style_fig(fig)
+    fig.update_layout(height=360)
+    fig.update_yaxes(title_text="EUR (positive = cost)")
+    fig.update_xaxes(title_text="Vintage (Norway time)")
     st.plotly_chart(fig, use_container_width=True)
 
 
 def render_backtest(bt: dict, basis: str) -> None:
-    st.markdown(f"##### Backtest — {basis.capitalize()} IaR vs realised cost (Kupiec POF)")
+    section(f"Backtest: {basis.capitalize()} IaR vs realised cost (Kupiec POF)")
     periods = bt.get("periods", pd.DataFrame())
     if periods is None or periods.empty:
-        st.info("No settled periods to backtest yet. Needs realised cost "
-                "(`load_actuals.py`) + backfilled vintages (`backfill_iar.py`), or the "
-                "Demo source.", icon="ℹ️")
+        st.info("No settled periods to backtest yet. The scheduled pipeline accrues these as "
+                "delivery days settle.")
         return
     c = st.columns(5)
     c[0].metric("Periods", bt["n_periods"])
@@ -377,24 +452,26 @@ def render_backtest(bt: dict, basis: str) -> None:
     c[2].metric("Observed rate", pct(bt["observed_rate"]))
     c[3].metric("Expected rate", pct(bt["expected_rate"]))
     p = bt["kupiec_p_value"]
-    c[4].metric("Kupiec p-value", "—" if p is None else f"{p:.3f}")
+    c[4].metric("Kupiec p-value", "n/a" if p is None else f"{p:.3f}")
     cal = bt["well_calibrated"]
     if cal is None:
         st.caption("Calibration verdict unavailable (no observations).")
     elif cal:
-        st.success("Kupiec POF: calibration **not rejected** — exceedance rate consistent "
-                   "with the confidence level.", icon="✅")
+        st.success("Kupiec POF: calibration not rejected. Exceedance rate is consistent with "
+                   "the confidence level.")
     else:
-        st.warning("Kupiec POF: calibration **rejected** — observed exceedances inconsistent "
-                   "with the model (note: low power on short windows).", icon="⚠️")
+        st.warning("Kupiec POF: calibration rejected. Observed exceedances are inconsistent with "
+                   "the model (note: low power on short windows).")
 
     fig = go.Figure()
     fig.add_bar(x=periods["period"], y=periods["realised_cost"], name="Realised cost",
-                marker_color=["#D8453B" if e else "#9aa0a6" for e in periods["exceeded"]])
+                marker_color=[BREACH_RED if e else "#9aa0a6" for e in periods["exceeded"]],
+                marker_line_width=0)
     fig.add_trace(go.Scatter(x=periods["period"], y=periods["iar_estimate"], name="IaR estimate",
-                             mode="lines+markers", line=dict(color=VOLUE_ORANGE, width=2)))
-    fig.update_layout(height=320, margin=dict(l=10, r=10, t=10, b=10),
-                      legend=dict(orientation="h", y=1.12), yaxis_title="€ (positive = cost)")
+                             mode="lines+markers", line=dict(color=VOLUE_ORANGE, width=2.5)))
+    _style_fig(fig)
+    fig.update_layout(height=320)
+    fig.update_yaxes(title_text="EUR (positive = cost)")
     st.plotly_chart(fig, use_container_width=True)
     with st.expander("Per-period detail"):
         st.dataframe(periods, use_container_width=True, hide_index=True)
@@ -406,18 +483,18 @@ def render_backtest(bt: dict, basis: str) -> None:
 def render_settings(kind: str):
     """Render the controls (in the Settings tab) and return the chosen selections.
 
-    Defined and called *before* the other tabs so their selected values are
-    available when those tabs render (Streamlit executes every tab body each run).
+    Defined and called before the other tabs so their selected values are available
+    when those tabs render (Streamlit executes every tab body each run).
     """
-    st.markdown("#### Controls")
+    section("Controls")
     try:
         pfs = r_portfolios(kind)
-    except Exception as exc:  # noqa: BLE001 — surface DB/import issues gracefully
+    except Exception as exc:  # noqa: BLE001 -- surface DB/import issues gracefully
         st.error(f"Could not load portfolios from the database: {exc}")
         st.stop()
     if pfs.empty:
-        st.warning("No portfolios found. Seed them with `scripts/seed_demo.py` and run "
-                   "`scripts/run_iar.py --store`.")
+        st.warning("No portfolios found. Seed them with scripts/seed_demo.py and run "
+                   "scripts/run_iar.py --store.")
         st.stop()
 
     # Selections persist in the URL query params so the 60s auto-refresh (a full page
@@ -427,7 +504,7 @@ def render_settings(kind: str):
     def _qp(key, default):
         return qp.get(key, default)
 
-    labels = [f"{r['price_area']} · {r['name']}" for _, r in pfs.iterrows()]
+    labels = [f"{r['price_area']} - {r['name']}" for _, r in pfs.iterrows()]
     try:
         idx_default = min(max(int(_qp("pf", 0)), 0), len(labels) - 1)
     except ValueError:
@@ -446,9 +523,9 @@ def render_settings(kind: str):
         conf_default = float(_qp("conf", 0.95))
     except ValueError:
         conf_default = 0.95
-    confidence = st.select_slider("Confidence (α)", options=conf_opts,
+    confidence = st.select_slider("Confidence (alpha)", options=conf_opts,
                                   value=conf_default if conf_default in conf_opts else 0.95,
-                                  format_func=lambda c: f"{c:.0%}  (α={1 - c:.2f})")
+                                  format_func=lambda c: f"{c:.0%}  (alpha={1 - c:.2f})")
     sig_opts = [0.01, 0.05, 0.10]
     try:
         sig_default = float(_qp("sig", 0.05))
@@ -462,28 +539,27 @@ def render_settings(kind: str):
         {"pf": str(idx), "basis": basis, "conf": str(confidence), "sig": str(significance)}
     )
 
-    if st.button("↻ Refresh data now", use_container_width=True):
+    if st.button("Refresh data now", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
-    st.caption("⟳ The view auto-refreshes every 60s; data is kept current by the "
-               "scheduled `scripts/refresh.py` pipeline.")
+    st.caption("The view auto-refreshes every 60s; data is kept current by the scheduled "
+               "scripts/refresh.py pipeline (Windows Task Scheduler, every 15 min).")
 
     st.divider()
-    st.caption(
-        "Data is read live from the SQLite database via `iar.service` — the dashboard "
-        "never calls Optimeering or the markets SDK directly. The pipeline (live feeds → "
-        "DB) is run by the backend scripts:"
-    )
-    st.code("python scripts/run_iar.py --area NO2 --store\n"
-            "python scripts/backfill_iar.py --area NO2 --start=-P5D --end=P0D\n"
-            "python scripts/run_backtest.py --area NO2", language="bash")
-    st.caption("Confidence (α) is the level the stored run was computed at; changing it here "
-               "drives the backtest target — re-run the pipeline to re-estimate at a new α.")
+    st.caption("Data is read live from the SQLite database via iar.service; the dashboard never "
+               "calls Optimeering or the markets SDK directly. The pipeline (live feeds to DB) "
+               "is run by the backend scripts:")
+    st.code("python scripts/refresh.py            # one full cycle, all areas\n"
+            "python scripts/run_iar.py --area NO2 --store\n"
+            "python scripts/backfill_iar.py --area NO2 --start=-P5D --end=P0D",
+            language="bash")
+    st.caption("Confidence (alpha) is the level the stored run was computed at; changing it here "
+               "drives the backtest target. Re-run the pipeline to re-estimate at a new alpha.")
     return pf, basis, confidence, significance
 
 
 def main() -> None:
-    st.set_page_config(page_title="Imbalance at Risk", page_icon="⚡", layout="wide")
+    st.set_page_config(page_title="Imbalance at Risk", layout="wide")
     st.markdown(_CSS, unsafe_allow_html=True)
     kind = "live"
 
@@ -497,7 +573,7 @@ def main() -> None:
     )
 
     header_box = st.container()  # filled after we know the selection (renders above tabs)
-    tabs = st.tabs(["⊞ Command Centre", "📈 Risk Analytics", "🗓 Historical", "⚙ Settings"])
+    tabs = st.tabs(["Command Centre", "Risk Analytics", "Historical", "Settings"])
 
     # Settings first (in code) so the selections drive the other tabs.
     with tabs[3]:
@@ -508,11 +584,10 @@ def main() -> None:
     with header_box:
         render_header(pf, ov, kind)
 
-    # --- Command Centre -------------------------------------------------- #
     with tabs[0]:
         if ov is None:
             st.info("No simulation run stored for this portfolio yet. Run "
-                    "`scripts/run_iar.py --area " + pf["price_area"] + " --store`.", icon="ℹ️")
+                    f"scripts/run_iar.py --area {pf['price_area']} --store.")
         else:
             render_kpis(ov)
             st.divider()
@@ -525,12 +600,10 @@ def main() -> None:
             with right:
                 render_alerts(r_alerts(kind, pid))
 
-    # --- Risk Analytics (IaR curve vs limit) ----------------------------- #
     with tabs[1]:
         render_curve(r_curve(kind, pid, basis), ov, basis)
         st.caption("Portfolio, Gross/Spread basis and confidence are in the Settings tab.")
 
-    # --- Historical (backtest) ------------------------------------------- #
     with tabs[2]:
         render_backtest(r_backtest(kind, pid, basis, significance), basis)
 
