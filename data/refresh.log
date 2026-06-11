@@ -913,3 +913,75 @@ note: with --basis both, only GROSS records were persisted (HistoricalPerformanc
 --- NO2: backtest ---
 --- SE3: backtest ---
 [refresh] done in 78s; pruned 3 stale live run(s).
+================================================================
+IaR Monte Carlo  |  area=NO1  MTUs=133  scenarios=10,000  confidence=95%
+forecast vintage : 2026-06-11T12:37:19.283813+00:00   (LIVE Optimeering spread)
+DAM spot price   : LIVE (Optimeering DAM cleared price, internal SDK)
+portfolio        : REAL - 'NO1 Wind' loaded via client CSV path (windsim)
+imbalance model  : normal, sigma=10% of capacity
+================================================================
+GROSS  | IaR =       +4,251 EUR   CIaR =       +5,262 EUR   mean =         +283 EUR
+SPREAD | IaR =         +752 EUR   CIaR =         +967 EUR   mean =          -13 EUR
+================================================================
+IaR = worst-case settlement cost at the confidence level (positive = cost).
+CIaR = average cost in the worst (1 - confidence) tail.
+NOTE: spread + DAM spot LIVE; positions/generation REAL (windsim) when loaded; only the imbalance sigma remains a parametric stub (calibrated in Week 3).
+================================================================
+[stored] SimulationRun #31 (portfolio #1) + 2 IaRResult rows -> C:\Users\sebastian.lopez\OneDrive - Volue AS\Documents\Code\IAR MVP\data\iar.db
+[alerts] no limit breaches
+================================================================
+Realised cost (3.1) | area=NO1 portfolio='NO1 Wind' (#1)
+stored: DAMPrice=192 rows, ActualImbalancePrice=188 rows -> C:\Users\sebastian.lopez\OneDrive - Volue AS\Documents\Code\IAR MVP\data\iar.db
+================================================================
+settled MTUs : 188  (2026-06-09 13:00 .. 2026-06-11 11:45 UTC)
+Realised GROSS  cost :       -1,712 EUR
+Realised SPREAD cost :         +103 EUR
+================================================================
+Per-MTU head (positive = cost):
+                timestamp  imbalance_mwh  actual_imbalance_price  gross_cost  spread_cost
+2026-06-09 13:00:00+00:00         0.2209                   22.00    4.859800    -1.186233
+2026-06-09 13:15:00+00:00         0.2005                   24.00    4.812000    -1.445605
+2026-06-09 13:30:00+00:00         0.3194                   32.60   10.412440    -0.031940
+2026-06-09 13:45:00+00:00         0.4058                   47.92   19.445936     0.000000
+2026-06-09 14:00:00+00:00         0.3708                   22.10    8.194680    -0.011124
+2026-06-09 14:15:00+00:00         0.2950                   25.37    7.484150    -1.831950
+2026-06-09 14:30:00+00:00         0.2614                   38.35   10.024690    -0.920128
+2026-06-09 14:45:00+00:00         0.2366                   52.27   12.367082    -3.411772
+================================================================
+Sign convention: imbalance = DAM position - actual delivery; positive cost = bad. Feeds the 3.3 backtest (iar.risk.backtest.run_backtest).
+================================================================
+IaR Monte Carlo  |  area=NO2  MTUs=133  scenarios=10,000  confidence=95%
+forecast vintage : 2026-06-11T12:37:46.465686+00:00   (LIVE Optimeering spread)
+DAM spot price   : LIVE (Optimeering DAM cleared price, internal SDK)
+portfolio        : REAL - 'NO2 Wind' loaded via client CSV path (windsim)
+imbalance model  : normal, sigma=10% of capacity
+================================================================
+GROSS  | IaR =       +4,693 EUR   CIaR =       +5,797 EUR   mean =         +311 EUR
+SPREAD | IaR =         +832 EUR   CIaR =       +1,077 EUR   mean =          -28 EUR
+================================================================
+IaR = worst-case settlement cost at the confidence level (positive = cost).
+CIaR = average cost in the worst (1 - confidence) tail.
+NOTE: spread + DAM spot LIVE; positions/generation REAL (windsim) when loaded; only the imbalance sigma remains a parametric stub (calibrated in Week 3).
+================================================================
+[stored] SimulationRun #32 (portfolio #2) + 2 IaRResult rows -> C:\Users\sebastian.lopez\OneDrive - Volue AS\Documents\Code\IAR MVP\data\iar.db
+[alerts] no limit breaches
+================================================================
+Realised cost (3.1) | area=NO2 portfolio='NO2 Wind' (#2)
+stored: DAMPrice=192 rows, ActualImbalancePrice=188 rows -> C:\Users\sebastian.lopez\OneDrive - Volue AS\Documents\Code\IAR MVP\data\iar.db
+================================================================
+settled MTUs : 188  (2026-06-09 13:00 .. 2026-06-11 11:45 UTC)
+Realised GROSS  cost :       -2,046 EUR
+Realised SPREAD cost :          -29 EUR
+================================================================
+Per-MTU head (positive = cost):
+                timestamp  imbalance_mwh  actual_imbalance_price  gross_cost  spread_cost
+2026-06-09 13:00:00+00:00         0.2209                   22.00    4.859800    -1.186233
+2026-06-09 13:15:00+00:00         0.2005                   24.00    4.812000    -1.483700
+2026-06-09 13:30:00+00:00         0.3194                   32.60   10.412440    -0.111790
+2026-06-09 13:45:00+00:00         0.4058                   48.31   19.604198    -0.016232
+2026-06-09 14:00:00+00:00         0.3708                   22.10    8.194680    -0.022248
+2026-06-09 14:15:00+00:00         0.2950                   25.37    7.484150    -1.896850
+2026-06-09 14:30:00+00:00         0.2614                   38.35   10.024690    -0.943654
+2026-06-09 14:45:00+00:00         0.2366                   52.27   12.367082    -3.575026
+================================================================
+Sign convention: imbalance = DAM position - actual delivery; positive cost = bad. Feeds the 3.3 backtest (iar.risk.backtest.run_backtest).
