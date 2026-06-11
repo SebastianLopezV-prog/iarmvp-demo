@@ -123,10 +123,10 @@ _CSS = f"""
   .u-hero .sub {{ font-size: 0.92rem; color: {MUTED}; margin-top: 6px; }}
   .u-card {{ border: 1px solid #ebedf0; border-radius: 12px; padding: 13px 15px; background: #fff;
              height: 100%; box-shadow: 0 2px 10px rgba(20,24,33,.05); }}
-  .u-card .term {{ font-weight: 800; color: {INK}; font-size: 0.95rem; }}
-  .u-card .body {{ font-size: 0.85rem; color: #4b5563; margin-top: 5px; line-height: 1.45; }}
+  .u-card .term {{ font-weight: 800; color: {INK}; font-size: 1.02rem; }}
+  .u-card .body {{ font-size: 0.93rem; color: #4b5563; margin-top: 5px; line-height: 1.5; }}
   .u-callout {{ background: #f1f6fc; border-left: 4px solid #2a7fd4; border-radius: 0 10px 10px 0;
-                padding: 12px 16px; font-size: 0.88rem; color: #33414f; line-height: 1.5; }}
+                padding: 12px 16px; font-size: 0.95rem; color: #33414f; line-height: 1.55; }}
   .pipe {{ display: flex; align-items: stretch; gap: 0; flex-wrap: wrap; margin: 2px 0 4px; }}
   .pipe-box {{ flex: 1; min-width: 140px; background: #fff; border: 1px solid #ebedf0;
                border-top: 3px solid {VOLUE_ORANGE}; border-radius: 12px; padding: 11px 13px;
