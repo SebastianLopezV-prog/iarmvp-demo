@@ -709,16 +709,18 @@ def _iar_illustration() -> go.Figure:
     return fig
 
 
-def _u_card(term: str, colour: str, body: str) -> str:
-    return (f"<div class='u-card' style='border-top:3px solid {colour}'>"
-            f"<div class='term'><span class='dot' style='background:{colour}'></span>{term}</div>"
-            f"<div class='body'>{body}</div></div>")
+def _feat_card(term: str, icon_key: str, body: str) -> str:
+    return (f"<div class='feat'><div class='rule'></div>"
+            f"<div class='ic'>{_icon(icon_key)}</div>"
+            f"<div class='h'>{term}</div><div class='p'>{body}</div></div>")
 
 
-def _cards_grid(items, cols: int = 2) -> None:
-    columns = st.columns(cols)
-    for i, (term, colour, body) in enumerate(items):
-        columns[i % cols].markdown(_u_card(term, colour, body), unsafe_allow_html=True)
+def _feat_grid(items, cols: int = 3) -> None:
+    """Render feature cards in aligned rows (a fresh column set per row keeps tops level)."""
+    for start in range(0, len(items), cols):
+        columns = st.columns(cols, gap="large")
+        for col, (term, icon_key, body) in zip(columns, items[start:start + cols]):
+            col.markdown(_feat_card(term, icon_key, body), unsafe_allow_html=True)
 
 
 def render_usage() -> None:
@@ -762,7 +764,11 @@ def render_usage() -> None:
 
     st.divider()
     section("Key measures")
-    _cards_grid(_DEFINITIONS, cols=2)
+    _feat_grid(_DEFINITIONS, cols=3)
+
+    st.divider()
+    section("Inputs and data")
+    _feat_grid(_INPUTS, cols=2)
 
     st.divider()
     section("The Monte Carlo method")
@@ -781,11 +787,11 @@ def render_usage() -> None:
 
     st.divider()
     section("Reading each panel")
-    _cards_grid([(t, "#9aa0a6", b) for t, b in _PANELS], cols=2)
+    _feat_grid(_PANELS, cols=3)
 
     st.divider()
     section("Confidence and refresh")
-    c1, c2 = st.columns(2)
+    c1, c2 = st.columns(2, gap="large")
     c1.markdown(
         "<div class='u-callout'><b>Confidence.</b> The confidence level (for example 95%) sets "
         "how far into the tail the IaR is read. Higher confidence gives a larger, more "
