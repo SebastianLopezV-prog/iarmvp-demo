@@ -178,6 +178,40 @@ def _measure(cost: np.ndarray, confidence: float) -> RiskMeasure:
     return RiskMeasure(iar=iar, ciar=ciar, mean=float(cost.mean()), cost=cost)
 
 
+def _per_mtu_measures(cost_mtu: np.ndarray, confidence: float) -> tuple[np.ndarray, np.ndarray]:
+    """Per-MTU IaR and CIaR: the standalone risk of each MTU's own cost column.
+
+    NB this is the *opposite* of the summed-quantile period IaR — each MTU is read
+    in isolation, so the sum of these per-MTU IaRs overstates the diversified period
+    risk (that gap is exactly the dashboard's "overperformance ratio").
+    """
+    iar = np.quantile(cost_mtu, confidence, axis=0)            # (n_mtus,)
+    tail_mask = cost_mtu >= iar[None, :]
+    counts = tail_mask.sum(axis=0)
+    ciar = np.where(
+        counts > 0,
+        (cost_mtu * tail_mask).sum(axis=0) / np.maximum(counts, 1),
+        iar,
+    )
+    return iar, ciar
+
+
+def _rolling_iar(cost_mtu: np.ndarray, confidence: float, window: int) -> float:
+    """Worst contiguous ``window``-MTU **summed-quantile** IaR across the horizon.
+
+    For each window position, sum each scenario's cost over the window (preserving
+    cross-MTU diversification) and take the quantile; return the worst window. Falls
+    back to the whole-horizon period IaR when the window covers all MTUs.
+    """
+    n = cost_mtu.shape[1]
+    w = min(window, n)
+    worst = -np.inf
+    for start in range(0, n - w + 1):
+        q = float(np.quantile(cost_mtu[:, start:start + w].sum(axis=1), confidence))
+        worst = max(worst, q)
+    return worst
+
+
 # --------------------------------------------------------------------------- #
 # Engine entry point
 # --------------------------------------------------------------------------- #
