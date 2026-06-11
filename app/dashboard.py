@@ -884,7 +884,6 @@ def render_settings(kind: str):
     Defined and called before the other tabs so their selected values are available
     when those tabs render (Streamlit executes every tab body each run).
     """
-    section("Controls")
     try:
         pfs = r_portfolios(kind)
     except Exception:  # noqa: BLE001 -- show a clean message, not a stack trace
@@ -901,51 +900,97 @@ def render_settings(kind: str):
     def _qp(key, default):
         return qp.get(key, default)
 
-    labels = [f"{r['price_area']} - {r['name']}" for _, r in pfs.iterrows()]
-    if len(labels) == 1:
-        idx = 0
-        st.markdown(f"**Portfolio:** {labels[0]}")
-    else:
+    section("Controls")
+    with st.container(border=True):
+        labels = [f"{r['price_area']} - {r['name']}" for _, r in pfs.iterrows()]
+        if len(labels) == 1:
+            idx = 0
+            st.markdown(f"**Portfolio:** {labels[0]}")
+        else:
+            try:
+                idx_default = min(max(int(_qp("pf", 0)), 0), len(labels) - 1)
+            except ValueError:
+                idx_default = 0
+            idx = st.selectbox("Portfolio", range(len(labels)), index=idx_default,
+                               format_func=lambda i: labels[i])
+        pf = pfs.iloc[idx].to_dict()
+
+        basis_opts = ["gross", "spread"]
+        basis_default = (basis_opts.index(_qp("basis", "gross"))
+                         if _qp("basis", "gross") in basis_opts else 0)
+        basis = st.radio("IaR basis", basis_opts, index=basis_default, horizontal=True,
+                         format_func=str.capitalize)
+
+        conf_opts = [0.90, 0.95, 0.99]
         try:
-            idx_default = min(max(int(_qp("pf", 0)), 0), len(labels) - 1)
+            conf_default = float(_qp("conf", 0.95))
         except ValueError:
-            idx_default = 0
-        idx = st.selectbox("Portfolio", range(len(labels)), index=idx_default,
-                           format_func=lambda i: labels[i])
-    pf = pfs.iloc[idx].to_dict()
+            conf_default = 0.95
+        confidence = st.select_slider("Confidence (alpha)", options=conf_opts,
+                                      value=conf_default if conf_default in conf_opts else 0.95,
+                                      format_func=lambda c: f"{c:.0%}  (alpha={1 - c:.2f})")
+        sig_opts = [0.01, 0.05, 0.10]
+        try:
+            sig_default = float(_qp("sig", 0.05))
+        except ValueError:
+            sig_default = 0.05
+        significance = st.select_slider("Kupiec significance", options=sig_opts,
+                                        value=sig_default if sig_default in sig_opts else 0.05)
 
-    basis_opts = ["gross", "spread"]
-    basis_default = basis_opts.index(_qp("basis", "gross")) if _qp("basis", "gross") in basis_opts else 0
-    basis = st.radio("IaR basis", basis_opts, index=basis_default, horizontal=True,
-                     format_func=str.capitalize)
+        st.query_params.update(
+            {"pf": str(idx), "basis": basis, "conf": str(confidence), "sig": str(significance)}
+        )
+        if st.button("Refresh now", use_container_width=True):
+            st.cache_data.clear()
+            st.rerun()
+        st.caption("The view refreshes every 5 minutes and the data pipeline updates every 15 "
+                   "minutes; use Refresh to pull the latest now.")
 
-    conf_opts = [0.90, 0.95, 0.99]
-    try:
-        conf_default = float(_qp("conf", 0.95))
-    except ValueError:
-        conf_default = 0.95
-    confidence = st.select_slider("Confidence (alpha)", options=conf_opts,
-                                  value=conf_default if conf_default in conf_opts else 0.95,
-                                  format_func=lambda c: f"{c:.0%}  (alpha={1 - c:.2f})")
-    sig_opts = [0.01, 0.05, 0.10]
-    try:
-        sig_default = float(_qp("sig", 0.05))
-    except ValueError:
-        sig_default = 0.05
-    significance = st.select_slider("Kupiec significance", options=sig_opts,
-                                    value=sig_default if sig_default in sig_opts else 0.05)
-
-    # Persist the selection to the URL (no rerun) for the next auto-reload.
-    st.query_params.update(
-        {"pf": str(idx), "basis": basis, "conf": str(confidence), "sig": str(significance)}
-    )
-
-    if st.button("Refresh now", use_container_width=True):
-        st.cache_data.clear()
-        st.rerun()
-    st.caption("The view refreshes every 5 minutes and the data pipeline updates every 15 "
-               "minutes; use Refresh to pull the latest now.")
+    section("Risk limits")
+    _render_limits(kind)
     return pf, basis, confidence, significance
+
+
+def _render_limits(kind: str) -> None:
+    """Editor (a bordered bubble) for the euro risk limits, pre-filled with the current
+    defaults. Saved overrides apply to the limit status, the KPI utilisation and alerts."""
+    with st.container(border=True):
+        st.caption("Defaults are configured; override the euro limits here for this portfolio. "
+                   "Changes apply to the status indicators, utilisation and alerts.")
+        try:
+            cur = get_data_source(kind).get_limit_settings()
+        except Exception:  # noqa: BLE001
+            st.info("Limit configuration is unavailable.")
+            return
+
+        rows = [("remaining_day", "Period (day)"), ("rolling_window", "Rolling (4h)"),
+                ("per_mtu", "Per-MTU (peak)")]
+        hdr = st.columns([1.5, 1, 1])
+        hdr[1].markdown("**Gross (EUR)**")
+        hdr[2].markdown("**Spread (EUR)**")
+        new = {"gross": {}, "spread": {}}
+        for lt, label in rows:
+            c = st.columns([1.5, 1, 1])
+            c[0].markdown(f"<div style='padding-top:10px;font-weight:600'>{label}</div>",
+                          unsafe_allow_html=True)
+            new["gross"][lt] = c[1].number_input(
+                f"gross {lt}", min_value=0.0, step=500.0, value=float(cur["gross"][lt]),
+                label_visibility="collapsed", key=f"lim_g_{lt}")
+            new["spread"][lt] = c[2].number_input(
+                f"spread {lt}", min_value=0.0, step=500.0, value=float(cur["spread"][lt]),
+                label_visibility="collapsed", key=f"lim_s_{lt}")
+
+        b = st.columns(2)
+        if b[0].button("Apply limits", use_container_width=True, type="primary"):
+            get_data_source(kind).save_limit_settings(new)
+            st.cache_data.clear()
+            st.toast("Risk limits updated.")
+            st.rerun()
+        if b[1].button("Reset to defaults", use_container_width=True):
+            get_data_source(kind).reset_limit_settings()
+            st.cache_data.clear()
+            st.toast("Risk limits reset to defaults.")
+            st.rerun()
 
 
 def main() -> None:
