@@ -565,32 +565,82 @@ def render_backtest(bt: dict, basis: str) -> None:
         st.dataframe(periods, use_container_width=True, hide_index=True)
 
 
+_ICONS = {
+    "scale": "<svg viewBox='0 0 24 24'><line x1='12' y1='3' x2='12' y2='21'/>"
+             "<line x1='4' y1='7' x2='20' y2='7'/><path d='M4 7l-3 7h6z'/>"
+             "<path d='M20 7l-3 7h6z'/><line x1='8' y1='21' x2='16' y2='21'/></svg>",
+    "activity": "<svg viewBox='0 0 24 24'><polyline points='22 12 18 12 15 21 9 3 6 12 2 12'/></svg>",
+    "trending": "<svg viewBox='0 0 24 24'><polyline points='23 6 13.5 15.5 8.5 10.5 1 18'/>"
+                "<polyline points='17 6 23 6 23 12'/></svg>",
+    "target": "<svg viewBox='0 0 24 24'><circle cx='12' cy='12' r='10'/>"
+              "<circle cx='12' cy='12' r='6'/><circle cx='12' cy='12' r='2'/></svg>",
+    "layers": "<svg viewBox='0 0 24 24'><polygon points='12 2 2 7 12 12 22 7 12 2'/>"
+              "<polyline points='2 17 12 22 22 17'/><polyline points='2 12 12 17 22 12'/></svg>",
+    "shield": "<svg viewBox='0 0 24 24'><path d='M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z'/></svg>",
+    "peak": "<svg viewBox='0 0 24 24'><polyline points='2 20 9 9 13 14 17 7 22 20'/></svg>",
+    "grid": "<svg viewBox='0 0 24 24'><rect x='3' y='3' width='7' height='7'/>"
+            "<rect x='14' y='3' width='7' height='7'/><rect x='14' y='14' width='7' height='7'/>"
+            "<rect x='3' y='14' width='7' height='7'/></svg>",
+    "bell": "<svg viewBox='0 0 24 24'><path d='M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9'/>"
+            "<path d='M13.73 21a2 2 0 0 1-3.46 0'/></svg>",
+    "clock": "<svg viewBox='0 0 24 24'><circle cx='12' cy='12' r='10'/>"
+             "<polyline points='12 6 12 12 16 14'/></svg>",
+    "cube": "<svg viewBox='0 0 24 24'><path d='M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4"
+            "A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z'/>"
+            "<polyline points='3.27 6.96 12 12.01 20.73 6.96'/><line x1='12' y1='22' x2='12' y2='12'/></svg>",
+    "database": "<svg viewBox='0 0 24 24'><ellipse cx='12' cy='5' rx='9' ry='3'/>"
+                "<path d='M21 12c0 1.66-4 3-9 3s-9-1.34-9-3'/>"
+                "<path d='M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5'/></svg>",
+    "spread": "<svg viewBox='0 0 24 24'><line x1='3' y1='12' x2='21' y2='12'/>"
+              "<polyline points='7 8 3 12 7 16'/><polyline points='17 8 21 12 17 16'/></svg>",
+}
+
+
+def _icon(key: str) -> str:
+    return _ICONS.get(key, _ICONS["activity"])
+
+
 _DEFINITIONS = [
-    ("Imbalance", BREACH_RED,
-     "Per 15-minute period (MTU): day-ahead position minus actual delivery. Positive "
-     "means short (delivered less than sold); negative means long."),
-    ("Gross IaR", VOLUE_ORANGE,
-     "Worst-case total settlement cost: imbalance times the absolute imbalance price, "
-     "summed across the horizon. The full cash exposure on the imbalance position."),
-    ("Spread IaR", VOLUE_ORANGE,
-     "Worst-case underperformance versus the day-ahead outcome: imbalance times the "
-     "difference between the imbalance price and the day-ahead price. Isolates the "
-     "settlement cost from the price level already locked in."),
-    ("CIaR (Expected Shortfall)", "#8a5cf6",
-     "The average cost across scenarios beyond the IaR threshold. IaR marks the edge of "
-     "the worst tail; CIaR measures how severe that tail is on average. CIaR is always "
-     "at least as large as IaR."),
-    ("Period IaR (summed-quantile)", TEAL,
-     "The quantile of cost summed across all MTUs in the horizon. The sum is taken "
-     "first, per scenario, then the quantile. It is not the sum of per-MTU IaRs, which "
-     "would assume every period goes wrong at once and overstate the risk."),
-    ("Overperformance ratio", TEAL,
-     "Period IaR divided by the naive sum of per-MTU IaRs. Below 1 quantifies the "
-     "diversification benefit: the worst day is less severe than the sum of the worst "
-     "individual periods. Lower means more diversification."),
-    ("Peak MTU IaR", WARN_AMBER,
-     "The largest single-MTU IaR across the horizon. Identifies the most exposed "
-     "15-minute period."),
+    ("Imbalance", "scale",
+     "Per 15-minute period (MTU), the day-ahead position minus actual delivery. A positive "
+     "value means short (delivered less than sold); a negative value means long."),
+    ("Gross IaR", "activity",
+     "Worst-case total settlement cost: imbalance times the absolute imbalance price, summed "
+     "across the horizon. It is the full cash exposure on the imbalance position."),
+    ("Spread IaR", "spread",
+     "Worst-case underperformance versus the day-ahead outcome: imbalance times the difference "
+     "between the imbalance price and the day-ahead price. It isolates the settlement cost from "
+     "the price level already locked in."),
+    ("CIaR (Expected Shortfall)", "target",
+     "The average cost across scenarios beyond the IaR threshold. IaR marks the edge of the worst "
+     "tail; CIaR measures how severe that tail is on average. CIaR is always at least as large as "
+     "IaR."),
+    ("Period IaR", "layers",
+     "The quantile of cost summed across all MTUs in the horizon. The sum is taken first, per "
+     "scenario, then the quantile. It is not the sum of per-MTU IaRs, which would assume every "
+     "period goes wrong at once and overstate the risk."),
+    ("Overperformance ratio", "shield",
+     "Period IaR divided by the naive sum of per-MTU IaRs. A value below 1 quantifies the "
+     "diversification benefit: the worst day is less severe than the sum of the worst individual "
+     "periods. A lower value means more diversification."),
+    ("Peak MTU IaR", "peak",
+     "The largest single-MTU IaR across the horizon. It identifies the most exposed 15-minute "
+     "period."),
+]
+
+_INPUTS = [
+    ("Imbalance price spread", "activity",
+     "A live forecast from Optimeering, supplied as a quantile curve per MTU. It is sampled by "
+     "inverse-CDF so the forecast tails are preserved rather than refitted."),
+    ("Day-ahead price", "trending",
+     "The cleared spot price, used to convert the spread into an absolute imbalance price for "
+     "Gross IaR."),
+    ("Positions and generation", "database",
+     "The portfolio's day-ahead position and forecast generation, which set the expected "
+     "imbalance for each period."),
+    ("Imbalance uncertainty (sigma)", "cube",
+     "The single modelled quantity: the spread of the imbalance volume, set as a fraction of "
+     "capacity because no historical forecast-error record exists yet."),
 ]
 
 _MC_STEPS = [

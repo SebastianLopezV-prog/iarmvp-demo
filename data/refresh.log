@@ -1001,3 +1001,98 @@ NOTE: spread + DAM spot LIVE; positions/generation REAL (windsim) when loaded; o
 ================================================================
 [stored] SimulationRun #33 (portfolio #3) + 2 IaRResult rows -> C:\Users\sebastian.lopez\OneDrive - Volue AS\Documents\Code\IAR MVP\data\iar.db
 [alerts] no limit breaches
+================================================================
+Realised cost (3.1) | area=SE3 portfolio='SE3 Wind' (#3)
+stored: DAMPrice=192 rows, ActualImbalancePrice=189 rows -> C:\Users\sebastian.lopez\OneDrive - Volue AS\Documents\Code\IAR MVP\data\iar.db
+================================================================
+settled MTUs : 189  (2026-06-09 13:00 .. 2026-06-11 12:00 UTC)
+Realised GROSS  cost :         -724 EUR
+Realised SPREAD cost :         +571 EUR
+================================================================
+Per-MTU head (positive = cost):
+                timestamp  imbalance_mwh  actual_imbalance_price  gross_cost  spread_cost
+2026-06-09 13:00:00+00:00         0.2209                   22.00     4.85980    -1.186233
+2026-06-09 13:15:00+00:00         0.2005                   24.00     4.81200    -1.746355
+2026-06-09 13:30:00+00:00         0.3194                   59.10    18.87654     7.806136
+2026-06-09 13:45:00+00:00         0.4058                   78.90    32.01762    11.171674
+2026-06-09 14:00:00+00:00         0.3708                   22.10     8.19468    -0.144612
+2026-06-09 14:15:00+00:00         0.2950                   25.37     7.48415    -2.566500
+2026-06-09 14:30:00+00:00         0.2614                   38.35    10.02469    -1.205054
+2026-06-09 14:45:00+00:00         0.2366                   37.00     8.75420    -8.865402
+================================================================
+Sign convention: imbalance = DAM position - actual delivery; positive cost = bad. Feeds the 3.3 backtest (iar.risk.backtest.run_backtest).
+================================================================
+IaR backtest (3.3) | area=NO1 portfolio='NO1 Wind' (#1)
+================================================================
+----------------------------------------------------------------
+basis: GROSS  (confidence n/a)
+  no settled periods to compare yet — load realised prices (load_actuals.py) and backfill estimates (backfill_iar.py).
+----------------------------------------------------------------
+basis: SPREAD  (confidence n/a)
+  no settled periods to compare yet — load realised prices (load_actuals.py) and backfill estimates (backfill_iar.py).
+================================================================
+stored -> C:\Users\sebastian.lopez\OneDrive - Volue AS\Documents\Code\IAR MVP\data\iar.db  (read back via iar.risk.backtest.load_performance_records)
+note: with --basis both, only GROSS records were persisted (HistoricalPerformanceRecord has no basis column).
+================================================================
+IaR backtest (3.3) | area=NO2 portfolio='NO2 Wind' (#2)
+================================================================
+----------------------------------------------------------------
+basis: GROSS  (confidence 95%)
+    period iar_estimate realised_cost exceeded
+2026-06-09        5,902           665   within
+2026-06-10        3,281          -859   within
+2026-06-11        1,154        -1,852   within
+----------------------------------------------------------------
+exceedances    : 0 / 3  (observed 0%, expected ~5%)
+Kupiec POF     : LR=0.308  p-value=0.579  ->  CALIBRATED (alpha=5%)
+records        : persisted
+----------------------------------------------------------------
+basis: SPREAD  (confidence 95%)
+    period iar_estimate realised_cost exceeded
+2026-06-09          697          -108   within
+2026-06-10          934           122   within
+2026-06-11          594           -43   within
+----------------------------------------------------------------
+exceedances    : 0 / 3  (observed 0%, expected ~5%)
+Kupiec POF     : LR=0.308  p-value=0.579  ->  CALIBRATED (alpha=5%)
+records        : NOT persisted (only the first basis persists with --basis both)
+================================================================
+stored -> C:\Users\sebastian.lopez\OneDrive - Volue AS\Documents\Code\IAR MVP\data\iar.db  (read back via iar.risk.backtest.load_performance_records)
+note: with --basis both, only GROSS records were persisted (HistoricalPerformanceRecord has no basis column).
+================================================================
+IaR backtest (3.3) | area=SE3 portfolio='SE3 Wind' (#3)
+================================================================
+----------------------------------------------------------------
+basis: GROSS  (confidence 95%)
+    period iar_estimate realised_cost exceeded
+2026-06-09        6,397         1,049   within
+2026-06-10        3,880          -264   within
+2026-06-11        1,665        -1,508   within
+----------------------------------------------------------------
+exceedances    : 0 / 3  (observed 0%, expected ~5%)
+Kupiec POF     : LR=0.308  p-value=0.579  ->  CALIBRATED (alpha=5%)
+records        : persisted
+----------------------------------------------------------------
+basis: SPREAD  (confidence 95%)
+    period iar_estimate realised_cost exceeded
+2026-06-09        2,156           366   within
+2026-06-10        3,033           301   within
+2026-06-11        2,002           -96   within
+----------------------------------------------------------------
+exceedances    : 0 / 3  (observed 0%, expected ~5%)
+Kupiec POF     : LR=0.308  p-value=0.579  ->  CALIBRATED (alpha=5%)
+records        : NOT persisted (only the first basis persists with --basis both)
+================================================================
+stored -> C:\Users\sebastian.lopez\OneDrive - Volue AS\Documents\Code\IAR MVP\data\iar.db  (read back via iar.risk.backtest.load_performance_records)
+note: with --basis both, only GROSS records were persisted (HistoricalPerformanceRecord has no basis column).
+[refresh] 2026-06-11T12:45:02.581409+00:00  mode=fast  areas=['NO1', 'NO2', 'SE3']
+--- NO1: live IaR ---
+--- NO1: realised prices ---
+--- NO2: live IaR ---
+--- NO2: realised prices ---
+--- SE3: live IaR ---
+--- SE3: realised prices ---
+--- NO1: backtest ---
+--- NO2: backtest ---
+--- SE3: backtest ---
+[refresh] done in 126s; pruned 3 stale live run(s).
