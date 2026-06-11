@@ -199,8 +199,8 @@ class ServiceDataSource(DataSource):
         sev = self.limit_status(portfolio_id)["severity"]
         return {
             "confidence": latest.get("confidence"),
-            "vintage_ts": latest.get("vintage_ts"),
-            "run_ts": latest.get("run_ts"),
+            "vintage_ts": _to_local(latest.get("vintage_ts")),
+            "run_ts": _to_local(latest.get("run_ts")),
             "n_scenarios": latest.get("n_scenarios"),
             "horizon": latest.get("horizon"),
             "gross": _basis("gross"),
