@@ -734,10 +734,10 @@ def main() -> None:
     kind = "live"
 
     header_box = st.container()  # header rendered once, above the tab strip
-    tabs = st.tabs(["Command Centre", "Risk Analytics", "Historical", "Settings"])
+    tabs = st.tabs(["Command Centre", "Risk Analytics", "Historical", "Usage", "Settings"])
 
     # Settings first (in code) so the selections drive the other tabs.
-    with tabs[3]:
+    with tabs[4]:
         pf, basis, confidence, significance = render_settings(kind)
     pid = int(pf["portfolio_id"])
 
