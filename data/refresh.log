@@ -1279,3 +1279,70 @@ note: with --basis both, only GROSS records were persisted (HistoricalPerformanc
 --- NO2: backtest ---
 --- SE3: backtest ---
 [refresh] done in 108s; pruned 3 stale live run(s).
+================================================================
+IaR Monte Carlo  |  area=NO2  MTUs=131  scenarios=10,000  confidence=95%
+forecast vintage : 2026-06-11T13:07:32.531404+00:00   (LIVE Optimeering spread)
+DAM spot price   : LIVE (Optimeering DAM cleared price, internal SDK)
+portfolio        : REAL - 'NO2 Wind' loaded via client CSV path (windsim)
+imbalance model  : normal, sigma=10% of capacity
+================================================================
+GROSS  | IaR =       +4,776 EUR   CIaR =       +5,838 EUR   mean =         +364 EUR
+SPREAD | IaR =         +839 EUR   CIaR =       +1,056 EUR   mean =           -5 EUR
+================================================================
+IaR = worst-case settlement cost at the confidence level (positive = cost).
+CIaR = average cost in the worst (1 - confidence) tail.
+NOTE: spread + DAM spot LIVE; positions/generation REAL (windsim) when loaded; only the imbalance sigma remains a parametric stub (calibrated in Week 3).
+================================================================
+[stored] SimulationRun #36 (portfolio #2) + 2 IaRResult rows -> C:\Users\sebastian.lopez\OneDrive - Volue AS\Documents\Code\IAR MVP\data\iar.db
+[alerts] no limit breaches
+================================================================
+Realised cost (3.1) | area=NO2 portfolio='NO2 Wind' (#2)
+stored: DAMPrice=192 rows, ActualImbalancePrice=188 rows -> C:\Users\sebastian.lopez\OneDrive - Volue AS\Documents\Code\IAR MVP\data\iar.db
+================================================================
+settled MTUs : 188  (2026-06-09 13:30 .. 2026-06-11 12:15 UTC)
+Realised GROSS  cost :       -2,084 EUR
+Realised SPREAD cost :          -22 EUR
+================================================================
+Per-MTU head (positive = cost):
+                timestamp  imbalance_mwh  actual_imbalance_price  gross_cost  spread_cost
+2026-06-09 13:30:00+00:00         0.3194                   32.60   10.412440    -0.111790
+2026-06-09 13:45:00+00:00         0.4058                   48.31   19.604198    -0.016232
+2026-06-09 14:00:00+00:00         0.3708                   22.10    8.194680    -0.022248
+2026-06-09 14:15:00+00:00         0.2950                   25.37    7.484150    -1.896850
+2026-06-09 14:30:00+00:00         0.2614                   38.35   10.024690    -0.943654
+2026-06-09 14:45:00+00:00         0.2366                   52.27   12.367082    -3.575026
+2026-06-09 15:00:00+00:00         0.1468                   32.00    4.697600    -1.059896
+2026-06-09 15:15:00+00:00         0.1039                   66.50    6.909350    -1.390182
+================================================================
+Sign convention: imbalance = DAM position - actual delivery; positive cost = bad. Feeds the 3.3 backtest (iar.risk.backtest.run_backtest).
+================================================================
+IaR backtest (3.3) | area=NO2 portfolio='NO2 Wind' (#2)
+================================================================
+----------------------------------------------------------------
+basis: GROSS  (confidence 95%)
+    period iar_estimate realised_cost exceeded
+2026-06-09        5,902           656   within
+2026-06-10        3,281          -859   within
+2026-06-11        1,154        -1,881   within
+----------------------------------------------------------------
+exceedances    : 0 / 3  (observed 0%, expected ~5%)
+Kupiec POF     : LR=0.308  p-value=0.579  ->  CALIBRATED (alpha=5%)
+records        : persisted
+----------------------------------------------------------------
+basis: SPREAD  (confidence 95%)
+    period iar_estimate realised_cost exceeded
+2026-06-09          697          -105   within
+2026-06-10          934           122   within
+2026-06-11          594           -39   within
+----------------------------------------------------------------
+exceedances    : 0 / 3  (observed 0%, expected ~5%)
+Kupiec POF     : LR=0.308  p-value=0.579  ->  CALIBRATED (alpha=5%)
+records        : NOT persisted (only the first basis persists with --basis both)
+================================================================
+stored -> C:\Users\sebastian.lopez\OneDrive - Volue AS\Documents\Code\IAR MVP\data\iar.db  (read back via iar.risk.backtest.load_performance_records)
+note: with --basis both, only GROSS records were persisted (HistoricalPerformanceRecord has no basis column).
+[refresh] 2026-06-11T13:15:02.973533+00:00  mode=fast  areas=['NO2']
+--- NO2: live IaR ---
+--- NO2: realised prices ---
+--- NO2: backtest ---
+[refresh] done in 85s; pruned 1 stale live run(s).
