@@ -51,7 +51,11 @@ _CSS = f"""
 <style>
   html, body, [class*="css"] {{ font-family: {FONT}; }}
   [data-testid="stAppViewContainer"] {{ background: #f5f6f8; }}
-  .block-container {{ padding-top: 0.8rem; padding-bottom: 1.8rem; padding-left: 1rem;
+  /* Hide Streamlit's fixed top toolbar (Deploy / menu) so it never overlaps the
+     VOLUE header, and so the view is clean for a client. */
+  [data-testid="stHeader"] {{ display: none; }}
+  [data-testid="stToolbar"] {{ display: none; }}
+  .block-container {{ padding-top: 1.2rem; padding-bottom: 1.8rem; padding-left: 1rem;
                       padding-right: 1rem; max-width: 1820px; }}
   /* Comfortable spacing (gaps ~16px, well above the 1/16in floor) with a wide content area. */
   [data-testid="stVerticalBlock"] {{ gap: 1rem; }}
