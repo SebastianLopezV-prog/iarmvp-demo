@@ -285,23 +285,33 @@ def store_actual_imbalance_price_records(
     """Persist realised imbalance prices (e.g. from ``markets_client.get_imbalance_prices``).
 
     ``records`` are dicts with ``timestamp`` (ISO 8601) and ``eur_per_mwh``. Writes
-    to the same ``actual_imbalance_prices`` table as :func:`load_actual_imbalance_prices`;
-    replaces existing rows for the area by default. Duplicate timestamps are
-    de-duplicated (last write wins).
+    to the same ``actual_imbalance_prices`` table as :func:`load_actual_imbalance_prices`.
+    With ``replace=True`` (default) it clears the area's existing rows first. With
+    ``replace=False`` it **upserts** only the incoming timestamps (updating duplicates,
+    keeping all other rows), so a narrow window can be refreshed without discarding
+    earlier history. Duplicate timestamps within ``records`` are de-duplicated.
     """
-    if replace:
-        session.query(ActualImbalancePrice).filter(
-            ActualImbalancePrice.price_area == price_area
-        ).delete()
-
     by_ts: dict = {}
     for r in records:
         ts = pd.to_datetime(r["timestamp"], utc=True).to_pydatetime()
         by_ts[ts] = float(r["eur_per_mwh"])
-    rows = [
-        ActualImbalancePrice(price_area=price_area, timestamp=ts, price=p)
-        for ts, p in by_ts.items()
-    ]
-    session.add_all(rows)
+
+    if replace:
+        session.query(ActualImbalancePrice).filter(
+            ActualImbalancePrice.price_area == price_area
+        ).delete()
+        session.add_all(
+            [ActualImbalancePrice(price_area=price_area, timestamp=ts, price=p)
+             for ts, p in by_ts.items()]
+        )
+    elif by_ts:
+        stmt = sqlite_insert(ActualImbalancePrice).values(
+            [{"price_area": price_area, "timestamp": ts, "price": p} for ts, p in by_ts.items()]
+        )
+        stmt = stmt.on_conflict_do_update(
+            index_elements=[ActualImbalancePrice.price_area, ActualImbalancePrice.timestamp],
+            set_={"price": stmt.excluded.price},
+        )
+        session.execute(stmt)
     session.flush()
-    return len(rows)
+    return len(by_ts)
