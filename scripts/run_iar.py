@@ -138,7 +138,7 @@ def main() -> None:
 
     times, pct, spread, vintage = fetch_spread_matrix(args.area)
     dam_map = fetch_dam_map(args.area)
-    pos_map, pf_name = fetch_positions_map(args.area)
+    pos_map, pf_name, pf_id = fetch_positions_map(args.area)
 
     # Simulate over the intersection of the available sources:
     #   live spread MTUs  ∩  (real DAM MTUs if any)  ∩  (real position MTUs if any).
