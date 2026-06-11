@@ -288,7 +288,9 @@ class ServiceDataSource(DataSource):
         raw = self._svc.get_iar_curve(portfolio_id, basis)
         if raw.empty:
             return _EMPTY_CURVE.copy()
-        return raw[["vintage_ts", "iar_value", "ciar_value", "confidence"]].reset_index(drop=True)
+        out = raw[["vintage_ts", "iar_value", "ciar_value", "confidence"]].reset_index(drop=True)
+        out["vintage_ts"] = _to_local(out["vintage_ts"])
+        return out
 
     # -- backtest ---------------------------------------------------------- #
     def backtest(
