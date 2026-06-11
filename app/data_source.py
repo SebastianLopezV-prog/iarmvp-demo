@@ -117,6 +117,20 @@ class DataSource(ABC):
         self, portfolio_id: int, *, basis: str = "gross", significance: float = 0.05
     ) -> dict: ...
 
+    # Risk-limit settings are global config (not a per-source data feed), so the base
+    # class implements them via iar.service for every source.
+    def get_limit_settings(self) -> dict:
+        from iar import service
+        return service.get_limit_settings()
+
+    def save_limit_settings(self, values: dict) -> None:
+        from iar import service
+        service.save_limit_settings(values)
+
+    def reset_limit_settings(self) -> None:
+        from iar import service
+        service.reset_limit_settings()
+
 
 # Empty-frame templates so the UI can render headers even with no rows.
 _EMPTY_INTRADAY = pd.DataFrame(
