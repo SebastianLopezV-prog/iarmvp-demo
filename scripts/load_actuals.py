@@ -75,8 +75,10 @@ def load_prices(args) -> tuple[int, int]:
             client = OptimeeringMarketsClient()  # raises a clear error if the wheel is missing
             dam = client.get_dam_prices(args.area, start=args.start, end=args.end)
             imb = client.get_imbalance_prices(args.area, start=args.start, end=args.end)
-            n_dam = store_dam_price_records(s, args.area, dam)
-            n_imb = store_actual_imbalance_price_records(s, args.area, imb)
+            # Upsert (replace=False): refresh only the fetched window, keep earlier
+            # settled history so the backtest window is not truncated by a small refresh.
+            n_dam = store_dam_price_records(s, args.area, dam, replace=False)
+            n_imb = store_actual_imbalance_price_records(s, args.area, imb, replace=False)
         s.commit()
     return n_dam, n_imb
 
