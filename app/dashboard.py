@@ -51,7 +51,13 @@ _CSS = f"""
 <style>
   html, body, [class*="css"] {{ font-family: {FONT}; }}
   [data-testid="stAppViewContainer"] {{ background: #f5f6f8; }}
-  .block-container {{ padding-top: 1.1rem; padding-bottom: 3rem; max-width: 1500px; }}
+  .block-container {{ padding-top: 0.8rem; padding-bottom: 1.8rem; padding-left: 1rem;
+                      padding-right: 1rem; max-width: 1820px; }}
+  /* Tighten spacing without squashing: gaps land at ~8px, above the 1/16in (6px) floor. */
+  [data-testid="stVerticalBlock"] {{ gap: 0.5rem; }}
+  [data-testid="stHorizontalBlock"] {{ gap: 0.5rem; }}
+  [data-testid="stMainBlockContainer"] {{ padding-left: 1rem; padding-right: 1rem; }}
+  hr {{ margin: 0.5rem 0 !important; }}
 
   .volue-bar {{
       background: linear-gradient(100deg, {INK} 0%, #1d2533 100%); color: #fff;
