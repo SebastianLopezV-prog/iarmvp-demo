@@ -211,11 +211,32 @@ def main() -> None:
             else:
                 pf = get_or_create_portfolio(s, "MC Runner", f"{args.area} Wind", args.area)
             v = datetime.fromisoformat(vintage) if vintage else datetime.now(timezone.utc)
+            # Per-MTU IaR detail (read-off of the same run) for the dashboard panels.
+            kept_ts = [ft[i].isoformat() for i in keep]
+
+            def _per_mtu_block(m):
+                return {
+                    "iar": m.iar_per_mtu.tolist(),
+                    "ciar": m.ciar_per_mtu.tolist(),
+                    "peak_iar": m.peak_mtu_iar,
+                    "rolling_iar": m.rolling_iar,
+                    "rolling_window": m.rolling_window,
+                }
+
+            per_mtu = {
+                "timestamps": kept_ts,
+                "position_mwh": np.asarray(dam_pos, dtype=float).tolist(),
+                "expected_imbalance_mwh": (np.asarray(dam_pos, dtype=float)
+                                           - np.asarray(gen, dtype=float)).tolist(),
+                "gross": _per_mtu_block(rep.gross),
+                "spread": _per_mtu_block(rep.spread),
+            }
             run = persist_report(
                 s, rep, pf.portfolio_id, vintage_ts=v, horizon=f"{n_mtus}xPT15M",
                 extra_config={"area": args.area, "dist": args.dist,
                               "sigma_fraction": args.sigma_fraction,
                               "dam_source": dam_src},
+                per_mtu=per_mtu,
             )
             s.commit()
             # Evaluate the stored run against per-portfolio euro-limits (3.4) so the
