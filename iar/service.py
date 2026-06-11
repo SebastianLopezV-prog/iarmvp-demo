@@ -282,6 +282,36 @@ def get_intraday(portfolio_id: int, *, session: Session | None = None) -> pd.Dat
         )
 
 
+def get_realised_intraday(
+    portfolio_id: int,
+    start=None,
+    end=None,
+    *,
+    session: Session | None = None,
+) -> pd.DataFrame:
+    """Per-MTU **realised** imbalance cost over ``[start, end)`` (settled MTUs only).
+
+    Columns ``[timestamp, realised_gross_cost, realised_spread_cost,
+    imbalance_mwh]`` — the "what actually happened" half of the intraday view, used
+    to fill elapsed MTUs so the heatmap is a full day (realised behind now, forecast
+    ahead). Empty until realised prices have been loaded (``load_actuals.py``).
+    """
+    cols = ["timestamp", "realised_gross_cost", "realised_spread_cost", "imbalance_mwh"]
+    with _scope(session) as s:
+        df = compute_realised_cost(s, portfolio_id, start=start, end=end)
+        if df.empty:
+            return pd.DataFrame(columns=cols)
+        return pd.DataFrame(
+            {
+                "timestamp": pd.to_datetime(df["timestamp"], utc=True),
+                "realised_gross_cost": df["gross_cost"],
+                "realised_spread_cost": df["spread_cost"],
+                "imbalance_mwh": df["imbalance_mwh"],
+            },
+            columns=cols,
+        )
+
+
 def get_limit_overview(portfolio_id: int, *, session: Session | None = None) -> pd.DataFrame:
     """Latest run's IaR vs limits across **all** limit types (day / rolling / per-MTU).
 
