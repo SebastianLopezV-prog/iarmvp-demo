@@ -280,17 +280,47 @@ def render_intraday(df: pd.DataFrame, basis: str) -> None:
     st.plotly_chart(fig, use_container_width=True)
 
 
-def _heat_grid(df: pd.DataFrame, value_col: str):
-    """Pivot a tidy [hour, quarter, value] frame to a full 24h x 4-quarter grid."""
-    return (
-        df.pivot_table(index="quarter", columns="hour", values=value_col, aggfunc="mean")
-        .reindex(index=[0, 15, 30, 45], columns=list(range(24)))
-    )
+_QUARTERS = [0, 15, 30, 45]
+_QUARTER_LABELS = [":00", ":15", ":30", ":45"]
 
 
-def _rounded_heatmap(grid, *, colorscale, colorbar_title: str, diverging: bool = False):
-    """A heatmap drawn as individual rounded-corner cells (one per MTU)."""
-    z = grid.values  # rows = quarters, cols = hours
+def _grid_from(df: pd.DataFrame, value_col: str, *, timeline: bool):
+    """Build (z, col_labels, col_hovers, divider_index) for one metric.
+
+    timeline=True  -> chronological hour columns across the span, so a span crossing
+                      midnight keeps today's 14:00 and tomorrow's 14:00 as distinct
+                      columns; returns the index of the first next-day column.
+    timeline=False -> a single-day clock (hours 00-23).
+    """
+    sub = df[df[value_col].notna()]
+    ts = pd.to_datetime(sub["timestamp"])
+    minute = ts.dt.minute
+    rowidx = {q: i for i, q in enumerate(_QUARTERS)}
+    if timeline:
+        keys = sorted(set(zip(ts.dt.date, ts.dt.hour)))
+        colidx = {k: i for i, k in enumerate(keys)}
+        z = np.full((4, len(keys)), np.nan)
+        for d, h, m, v in zip(ts.dt.date, ts.dt.hour, minute, sub[value_col]):
+            if m in rowidx:
+                z[rowidx[m], colidx[(d, h)]] = v
+        first_date = keys[0][0] if keys else None
+        col_labels = [f"{h:02d}" for (_, h) in keys]
+        col_hovers = [("Today " if d == first_date else "Next day ") + f"{h:02d}" for (d, h) in keys]
+        divider_index = next((i for i, (d, _) in enumerate(keys) if d != first_date), None)
+        return z, col_labels, col_hovers, divider_index
+    z = np.full((4, 24), np.nan)
+    for h, m, v in zip(ts.dt.hour, minute, sub[value_col]):
+        if m in rowidx:
+            z[rowidx[m], h] = v
+    labels = [f"{h:02d}" for h in range(24)]
+    hovers = [f"{h:02d}" for h in range(24)]
+    return z, labels, hovers, None
+
+
+def _rounded_heatmap(z, *, row_labels, col_labels, col_hovers, colorscale, colorbar_title,
+                     diverging: bool = False, divider_index=None, divider_label=None):
+    """Heatmap drawn as individual rounded cells; arbitrary columns + optional day divider."""
+    z = np.asarray(z, dtype=float)
     finite = z[np.isfinite(z)]
     if finite.size == 0:
         vmin, vmax = 0.0, 1.0
@@ -306,17 +336,16 @@ def _rounded_heatmap(grid, *, colorscale, colorbar_title: str, diverging: bool =
         t = 0.5 if vmax == vmin else min(max((v - vmin) / (vmax - vmin), 0.0), 1.0)
         return pcolors.sample_colorscale(colorscale, [t])[0]
 
-    quarters, hours = list(grid.index), list(grid.columns)
-    nq = len(quarters)
+    nrows, ncols = z.shape
     pad, rx, ry = 0.07, 0.17, 0.17
     fig = go.Figure()
     hx, hy, ht = [], [], []
-    for qi in range(nq):
-        for hi in range(len(hours)):
-            v = z[qi, hi]
+    for qi in range(nrows):
+        for ci in range(ncols):
+            v = z[qi, ci]
             if not np.isfinite(v):
                 continue
-            x0, x1, y0, y1 = hi + pad, hi + 1 - pad, qi + pad, qi + 1 - pad
+            x0, x1, y0, y1 = ci + pad, ci + 1 - pad, qi + pad, qi + 1 - pad
             path = (
                 f"M {x0 + rx},{y0} L {x1 - rx},{y0} Q {x1},{y0} {x1},{y0 + ry} "
                 f"L {x1},{y1 - ry} Q {x1},{y1} {x1 - rx},{y1} "
@@ -325,9 +354,9 @@ def _rounded_heatmap(grid, *, colorscale, colorbar_title: str, diverging: bool =
             )
             fig.add_shape(type="path", path=path, fillcolor=color_at(v),
                           line=dict(width=0), layer="below")
-            hx.append(hi + 0.5)
+            hx.append(ci + 0.5)
             hy.append(qi + 0.5)
-            ht.append(f"{hours[hi]:02d}:{quarters[qi]:02d}<br>EUR {v:,.0f}")
+            ht.append(f"{col_hovers[ci]}{row_labels[qi]}<br>EUR {v:,.0f}")
     fig.add_trace(go.Scatter(x=hx, y=hy, mode="markers",
                              marker=dict(size=18, color="rgba(0,0,0,0)"),
                              hoverinfo="text", text=ht, showlegend=False))
@@ -337,54 +366,58 @@ def _rounded_heatmap(grid, *, colorscale, colorbar_title: str, diverging: bool =
         marker=dict(size=6, color=[vmin], colorscale=colorscale, cmin=vmin, cmax=vmax,
                     showscale=True, colorbar=dict(title=colorbar_title, thickness=12, outlinewidth=0)),
     ))
+    if divider_index is not None:
+        fig.add_shape(type="line", x0=divider_index, x1=divider_index, y0=-0.15, y1=nrows + 0.15,
+                      line=dict(color="#374151", width=2, dash="dot"), layer="above")
+        if divider_label:
+            fig.add_annotation(x=divider_index + 0.1, y=nrows + 0.12, text=divider_label,
+                               showarrow=False, xanchor="left", yanchor="bottom",
+                               font=dict(size=12, color="#374151"))
+    axis_tick = dict(size=13, color="#2b3038")
+    axis_title = dict(size=12.5, color="#4b5563")
     fig.update_layout(
-        height=230, margin=dict(l=12, r=12, t=8, b=10),
+        height=240, margin=dict(l=12, r=12, t=24, b=10),
         font=dict(family=FONT, size=12, color="#374151"),
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
     )
-    axis_tick = dict(size=13, color="#2b3038")
-    axis_title = dict(size=12.5, color="#4b5563")
-    fig.update_xaxes(range=[-0.2, 24.2], tickvals=[i + 0.5 for i in range(len(hours))],
-                     ticktext=[f"{h:02d}" for h in hours], showgrid=False, zeroline=False,
-                     tickfont=axis_tick, title_text="Hour of day (00-23, Norway time)",
-                     title_font=axis_title)
-    fig.update_yaxes(range=[-0.2, nq + 0.2], tickvals=[i + 0.5 for i in range(nq)],
-                     ticktext=[f":{q:02d}" for q in quarters], showgrid=False, zeroline=False,
-                     tickfont=axis_tick, title_text="Quarter", title_font=axis_title)
+    fig.update_xaxes(range=[-0.2, ncols + 0.2], tickvals=[i + 0.5 for i in range(ncols)],
+                     ticktext=col_labels, showgrid=False, zeroline=False, tickfont=axis_tick,
+                     title_text="Hour of day (Norway time)", title_font=axis_title)
+    fig.update_yaxes(range=[-0.2, nrows + 0.2], tickvals=[i + 0.5 for i in range(nrows)],
+                     ticktext=row_labels, showgrid=False, zeroline=False, tickfont=axis_tick,
+                     title_text="Quarter", title_font=axis_title)
     return fig
 
 
 def render_heatmaps(df: pd.DataFrame, basis: str) -> None:
-    """Two separate heatmaps: forecast worst-case IaR and realised cost.
-
-    Different metrics (a P95 risk bound vs a single settled outcome), so each gets its
-    own colour scale and they are never compared on one. Forecast fills the forward
-    MTUs; realised fills the settled ones; the empty halves are expected.
-    """
+    """Two separate heatmaps: forecast worst-case IaR (up to 24h ahead, day-demarcated)
+    and realised cost (today's settled). Different metrics, each on its own scale."""
     if df.empty or "forecast_iar" not in df.columns:
         st.info("No per-MTU series for this run.")
         return
 
     section(f"Forecast IaR heatmap: {basis.capitalize()} P95 worst-case (Norway time)")
-    st.caption("95th-percentile worst-case cost per MTU (a risk bound). Forward MTUs only; "
-               "the past is not forecast.")
+    st.caption("95th-percentile worst-case cost per MTU (a risk bound), projected from now up to "
+               "24 hours ahead. The dotted line marks the start of the next day.")
+    fz, fcl, fch, fdiv = _grid_from(df, "forecast_iar", timeline=True)
     st.plotly_chart(
-        _rounded_heatmap(_heat_grid(df, "forecast_iar"),
+        _rounded_heatmap(fz, row_labels=_QUARTER_LABELS, col_labels=fcl, col_hovers=fch,
                          colorscale=[[0, "#FFF1E8"], [0.5, VOLUE_ORANGE], [1, BREACH_RED]],
-                         colorbar_title="EUR"),
+                         colorbar_title="EUR", divider_index=fdiv, divider_label="Next day"),
         use_container_width=True,
     )
 
     section(f"Realised cost heatmap: {basis.capitalize()} settled outcome (Norway time)")
-    rl = _heat_grid(df, "realised_iar")
-    if not np.isfinite(np.nanmax(np.abs(rl.values))):
-        st.info("No settled realised cost for this day yet. Imbalance prices publish with a "
-                "delay, so this fills in as the day settles.")
+    if not df["realised_iar"].notna().any():
+        st.info("No settled realised cost for today yet. Imbalance prices publish with a delay, "
+                "so this fills in as the day settles.")
         return
     st.caption("Actual cost per MTU once settled (one realised outcome, not a worst case). "
                "Blue is net revenue, red is net cost, on its own scale.")
+    rz, rcl, rch, _ = _grid_from(df, "realised_iar", timeline=False)
     st.plotly_chart(
-        _rounded_heatmap(rl, colorscale="RdBu_r", colorbar_title="EUR", diverging=True),
+        _rounded_heatmap(rz, row_labels=_QUARTER_LABELS, col_labels=rcl, col_hovers=rch,
+                         colorscale="RdBu_r", colorbar_title="EUR", diverging=True),
         use_container_width=True,
     )
 
