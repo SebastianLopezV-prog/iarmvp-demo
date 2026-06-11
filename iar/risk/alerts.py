@@ -31,6 +31,7 @@ Pure vs persisting: :func:`classify_severity` and :func:`check_run` are pure
 
 from __future__ import annotations
 
+import json
 import tomllib
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -43,6 +44,9 @@ from iar.db.models import Alert, SimulationRun
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_LIMITS_PATH = PROJECT_ROOT / "config" / "limits.toml"
+# User-set overrides written from the dashboard Settings tab, merged over the toml
+# default block by load_limits. Lives in data/ (runtime, gitignored).
+LIMITS_OVERRIDE_PATH = PROJECT_ROOT / "data" / "limits_override.json"
 LIMIT_TYPES = ("per_mtu", "rolling_window", "remaining_day")
 SOFT_RATIO = 0.80
 
