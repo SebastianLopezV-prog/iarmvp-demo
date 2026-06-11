@@ -52,7 +52,9 @@ def parse_args() -> argparse.Namespace:
     ap.add_argument("--area", default="NO2", help="our price area to file it under (NO1/NO2/SE3)")
     ap.add_argument("--user", default="Wind Co", help="our user/customer name")
     ap.add_argument("--portfolio-name", default=None, help="our portfolio name (default '<area> Wind')")
-    ap.add_argument("--days", type=int, default=4, help="number of days from today to generate")
+    ap.add_argument("--days", type=int, default=4, help="number of days from the start to generate")
+    ap.add_argument("--start", default=None,
+                    help="windsim start date YYYY-MM-DD (default today; use a past date for history)")
     ap.add_argument("--seed", type=int, default=1, help="windsim seed (deterministic)")
     ap.add_argument("--db", default=str(DEFAULT_DB), help="windsim DuckDB path")
     ap.add_argument("--regen", action="store_true", help="regenerate the windsim DB even if present")
