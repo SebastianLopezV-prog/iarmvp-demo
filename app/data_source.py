@@ -27,9 +27,26 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 import numpy as np
 import pandas as pd
+
+# Display timezone: the portfolios are Nordic, settlement is per local day, so the UI
+# shows Norwegian wall-clock time. The backend/DB stay in UTC — this is display-only.
+DISPLAY_TZ = ZoneInfo("Europe/Oslo")
+
+
+def _to_local(value):
+    """Convert a UTC timestamp / datetime Series to the display timezone (Oslo)."""
+    if value is None:
+        return value
+    if isinstance(value, pd.Series):
+        return pd.to_datetime(value, utc=True).dt.tz_convert(DISPLAY_TZ)
+    ts = pd.Timestamp(value)
+    if ts.tzinfo is None:
+        ts = ts.tz_localize("UTC")
+    return ts.tz_convert(DISPLAY_TZ)
 
 # Reuse the *real* Kupiec test even for synthetic data, so the demo's backtest
 # verdict is computed exactly the way the production path computes it.
