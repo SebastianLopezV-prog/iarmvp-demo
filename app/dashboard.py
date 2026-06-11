@@ -185,8 +185,12 @@ def _style_fig(fig: go.Figure) -> go.Figure:
         legend=dict(orientation="h", y=1.14, x=0, font=dict(size=11)),
         hoverlabel=dict(font_size=12),
     )
-    fig.update_xaxes(showgrid=False, zeroline=False, linecolor="#e5e7eb")
-    fig.update_yaxes(showgrid=True, gridcolor="#f0f1f4", zeroline=False)
+    tick = dict(size=12, color="#2b3038")
+    title = dict(size=12.5, color="#4b5563")
+    fig.update_xaxes(showgrid=False, zeroline=False, linecolor="#e5e7eb",
+                     tickfont=tick, title_font=title)
+    fig.update_yaxes(showgrid=True, gridcolor="#f0f1f4", zeroline=False,
+                     tickfont=tick, title_font=title)
     return fig
 
 
