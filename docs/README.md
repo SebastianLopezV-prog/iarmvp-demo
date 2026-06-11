@@ -55,7 +55,6 @@ iar/
                alerts.py (3.4), calibration.py (sigma calibration)
   service.py   frozen read API for the UI (3.5)
 app/           Streamlit dashboard (UI only; skeleton for service.py, built in 4.1)
-beginner UI/   dashboard.py, demo risk dashboard (committed; needs the deps above)
 scripts/       run_pipeline.py       (ingest then store smoke path)
                run_iar.py            (run the Monte Carlo, print/store IaR + alerts)
                load_windsim_data.py  (real portfolio data via the client CSV path)
