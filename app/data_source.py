@@ -318,32 +318,32 @@ class DemoDataSource(DataSource):
 
     # -- KPI overview ------------------------------------------------------ #
     def overview(self, portfolio_id: int, *, confidence: float = 0.95) -> dict | None:
-        scale = self._conf_scale(confidence)
         out: dict = {
             "confidence": confidence,
             "vintage_ts": _DEMO_NOW - timedelta(hours=10),
             "run_ts": _DEMO_NOW - timedelta(minutes=8),
             "n_scenarios": 10_000,
             "horizon": "96xPT15M",
-            "overperformance_ratio": round(0.72 + 0.0 * portfolio_id, 2),
         }
-        rng = self._rng(portfolio_id)
         for basis in ("gross", "spread"):
-            forecast, _ = self._mtu_profile(portfolio_id, basis, confidence)
-            # Period IaR is NOT the sum of per-MTU IaRs (summed-quantile concept);
-            # approximate it as a sub-additive aggregate for plausible demo numbers.
-            period = float(forecast.sum() * (0.62 + 0.04 * rng.random()))
+            forecast, _ = self._mtu_series(portfolio_id, basis, confidence)
+            period = self._current(portfolio_id, basis, "remaining_day", confidence)
             peak = float(forecast.max())
             limit = _DEMO_LIMITS[basis]["remaining_day"]
             util = period / limit
             out[basis] = {
                 "period_iar": period,
-                "ciar": period * (1.18 + 0.05 * rng.random()),
+                "ciar": period * 1.2,
                 "peak_mtu_iar": peak,
-                "limit": limit,
+                "limit": float(limit),
                 "utilisation": util,
                 "severity": _severity(util),
             }
+        # Overperformance ratio = summed-quantile period IaR ÷ naive Σ(per-MTU IaR):
+        # the diversification benefit the architecture's summed-quantile period IaR
+        # captures (< 1 ⇒ the day is less risky than the sum of its worst MTUs).
+        gross_series, _ = self._mtu_series(portfolio_id, "gross", confidence)
+        out["overperformance_ratio"] = round(out["gross"]["period_iar"] / gross_series.sum(), 2)
         statuses = self.limit_status(portfolio_id)["severity"]
         out["n_warnings"] = int((statuses == "soft").sum())
         out["n_breaches"] = int((statuses == "hard").sum())
