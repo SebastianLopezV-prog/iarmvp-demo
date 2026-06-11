@@ -688,8 +688,10 @@ def render_usage() -> None:
         unsafe_allow_html=True,
     )
     st.plotly_chart(_iar_illustration(), use_container_width=True)
-    st.caption("Illustrative distribution of simulated horizon cost. IaR is the 95th-percentile "
-               "point; CIaR is the average of the shaded worst-5% tail beyond it.")
+    st.caption("Illustrative fat-tailed (Student-t) distribution shown in the conventional "
+               "Value-at-Risk orientation (lower is worse). IaR marks the bottom 5%; CIaR is the "
+               "average of the shaded bottom-5% tail. In the dashboard the same tail is reported "
+               "as cost, where positive is worse.")
 
     st.divider()
     section("Key measures")
