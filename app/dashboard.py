@@ -150,7 +150,7 @@ def render_header(pf: dict, ov: dict | None, kind: str) -> None:
           <div class="brand">VOL<span>U</span>E &nbsp; <span style="color:#fff;font-weight:600;
                letter-spacing:0;">Imbalance at Risk</span></div>
           <div class="meta">{pf['name']} &nbsp;·&nbsp; Area {pf['price_area']}
-               &nbsp;·&nbsp; <b>{tag}</b> · as of {as_of}{warn}</div>
+               &nbsp;·&nbsp; <b>{tag}</b> · as of {as_of} (Norway){warn}</div>
         </div>
         """,
         unsafe_allow_html=True,
