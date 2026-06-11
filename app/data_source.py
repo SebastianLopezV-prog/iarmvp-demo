@@ -249,6 +249,14 @@ _DEMO_LIMITS = {
     "gross": {"remaining_day": 50_000, "rolling_window": 10_000, "per_mtu": 3_000},
     "spread": {"remaining_day": 30_000, "rolling_window": 6_000, "per_mtu": 1_500},
 }
+# Target "current" IaR figures (EUR) the demo anchors on — chosen to reproduce the
+# Command-Centre mockup. NB these aggregates are **summed-quantile** (sub-additive),
+# so the period/rolling figures are deliberately *not* sums of the per-MTU series;
+# the gap is what the overperformance ratio reports.
+_DEMO_TARGETS = {
+    "gross": {"remaining_day": 42_800, "rolling_window": 9_200, "per_mtu": 2_140},
+    "spread": {"remaining_day": 18_300, "rolling_window": 3_600, "per_mtu": 880},
+}
 _DEMO_PORTFOLIOS = [
     (1, "NO1 Wind", "NO1"),
     (2, "NO2 Wind", "NO2"),
