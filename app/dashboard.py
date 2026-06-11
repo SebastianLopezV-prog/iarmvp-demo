@@ -569,7 +569,10 @@ def main() -> None:
     pid = int(pf["portfolio_id"])
 
     with header_box:
-        render_header(pf, r_overview(kind, pid, confidence), kind)
+        @st.fragment(run_every=AUTO_REFRESH_SECONDS)
+        def _header() -> None:
+            render_header(pf, r_overview(kind, pid, confidence), kind)
+        _header()
 
     # Each tab's content lives in its own fragment that re-runs in place every
     # AUTO_REFRESH_SECONDS (no full page reload). Defining the fragment INSIDE the tab
