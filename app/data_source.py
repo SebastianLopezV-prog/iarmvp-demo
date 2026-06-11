@@ -222,16 +222,16 @@ class ServiceDataSource(DataSource):
             row = overview[(overview["iar_type"] == basis) & (overview["limit_type"] == "per_mtu")]
             if not row.empty:
                 mtu_limit = float(row["limit_value"].iloc[0])
-        now = pd.Timestamp.now(tz="UTC")
-        ts = raw["timestamp"]
+        utc_ts = pd.to_datetime(raw["timestamp"], utc=True)
+        is_past = utc_ts < pd.Timestamp.now(tz="UTC")
         return pd.DataFrame(
             {
-                "timestamp": ts,
+                "timestamp": utc_ts.dt.tz_convert(DISPLAY_TZ),  # local time for the axis
                 "forecast_iar": raw[f"{basis}_iar"],
                 "realised_iar": pd.NA,  # realised per-MTU cost needs actuals (not yet settled)
                 "position_mwh": raw["position_mwh"],
                 "mtu_limit": mtu_limit,
-                "is_past": ts < now,
+                "is_past": is_past,
             }
         )
 
@@ -239,7 +239,7 @@ class ServiceDataSource(DataSource):
         raw = self._svc.get_intraday(portfolio_id)
         if raw.empty:
             return _EMPTY_HEATMAP.copy()
-        ts = pd.to_datetime(raw["timestamp"])
+        ts = pd.to_datetime(raw["timestamp"], utc=True).dt.tz_convert(DISPLAY_TZ)  # local hours
         return pd.DataFrame(
             {"hour": ts.dt.hour, "quarter": ts.dt.minute, "iar": raw[f"{basis}_iar"]}
         )
