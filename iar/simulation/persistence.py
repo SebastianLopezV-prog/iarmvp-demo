@@ -19,10 +19,44 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 
+import numpy as np
 from sqlalchemy.orm import Session
 
 from iar.db.models import IaRResult, SimulationRun
 from iar.simulation.engine import IaRReport
+
+
+def build_per_mtu(
+    report: IaRReport,
+    timestamps: list[str],
+    dam_position,
+    forecast_generation,
+) -> dict:
+    """Assemble the per-MTU read-off payload for ``persist_report(per_mtu=...)``.
+
+    Shared by the live run (``run_iar.py``) and the backfill (``replay.py``) so both
+    persist the same shape: per-MTU gross/spread IaR & CIaR series, the peak/rolling
+    scalars, the per-MTU positions, and the (ISO) timestamps. Numbers only.
+    """
+    dam = np.asarray(dam_position, dtype=float)
+    gen = np.asarray(forecast_generation, dtype=float)
+
+    def _block(m) -> dict:
+        return {
+            "iar": m.iar_per_mtu.tolist(),
+            "ciar": m.ciar_per_mtu.tolist(),
+            "peak_iar": m.peak_mtu_iar,
+            "rolling_iar": m.rolling_iar,
+            "rolling_window": m.rolling_window,
+        }
+
+    return {
+        "timestamps": list(timestamps),
+        "position_mwh": dam.tolist(),
+        "expected_imbalance_mwh": (dam - gen).tolist(),
+        "gross": _block(report.gross),
+        "spread": _block(report.spread),
+    }
 
 
 def persist_report(
