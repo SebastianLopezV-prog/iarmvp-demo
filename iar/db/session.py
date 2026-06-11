@@ -31,12 +31,25 @@ DEFAULT_DB_PATH = PROJECT_ROOT / "data" / "iar.db"
 
 
 def _enable_sqlite_fk(engine: Engine) -> None:
-    """Turn on foreign-key enforcement (off by default in SQLite)."""
+    """Set per-connection SQLite pragmas.
+
+    - ``foreign_keys=ON``: enforce FKs (off by default in SQLite).
+    - ``journal_mode=WAL``: let readers and writers work concurrently, so the
+      always-open dashboard (reading) and the scheduled refresh (writing) don't
+      block each other. Persisted on the DB file; setting it per-connect is a no-op
+      after the first. Skipped for in-memory DBs (WAL is not applicable there).
+    - ``busy_timeout=5000``: wait up to 5s for a lock instead of failing immediately.
+    """
 
     @event.listens_for(engine, "connect")
     def _set_pragma(dbapi_connection, _connection_record):  # noqa: ANN001
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.execute("PRAGMA busy_timeout=5000")
+        try:
+            cursor.execute("PRAGMA journal_mode=WAL")
+        except Exception:  # noqa: BLE001 -- e.g. in-memory DB; harmless
+            pass
         cursor.close()
 
 
