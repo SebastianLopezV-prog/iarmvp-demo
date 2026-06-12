@@ -1096,6 +1096,13 @@ def main() -> None:
     _ensure_data()  # build synthetic data if the DB is empty (no-op once seeded)
     kind = "live"
 
+    # If the database is still empty (e.g. the first-load seed is mid-run or failed),
+    # show a clear message instead of crashing the layout on an empty portfolio list.
+    if r_portfolios(kind).empty:
+        st.info("Preparing the live demo data. This can take a minute on first load. "
+                "Please refresh the page shortly.")
+        st.stop()
+
     # Living demo: a lightweight fragment that advances the synthetic data forward when
     # it goes stale (new settled MTUs, fresh forecast, updated backtest), so the hosted
     # demo keeps ticking while it is open rather than showing a frozen snapshot.

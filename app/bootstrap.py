@@ -39,6 +39,12 @@ _LOCK_TTL_SECONDS = 180
 
 def _run(script: str, *args: str) -> None:
     env = dict(os.environ, IAR_SYNTHETIC="1")
+    # Make the `iar` package importable in the subprocess (and its grandchildren, which
+    # inherit this env). On a host there is no editable install: the dashboard imports
+    # `iar` via a sys.path tweak, but a child process does not inherit that - so without
+    # this the seed scripts fail with ModuleNotFoundError and the DB stays empty.
+    existing = env.get("PYTHONPATH", "")
+    env["PYTHONPATH"] = str(PROJECT_ROOT) + (os.pathsep + existing if existing else "")
     subprocess.run(
         [sys.executable, str(PROJECT_ROOT / "scripts" / script), *args],
         cwd=str(PROJECT_ROOT), env=env, check=False,
