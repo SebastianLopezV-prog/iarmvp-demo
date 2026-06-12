@@ -33,7 +33,9 @@ Units are EUR/MWh. Timestamps are ISO 8601 UTC strings, matching the real client
 from __future__ import annotations
 
 import hashlib
+import json
 import re
+from pathlib import Path
 from datetime import datetime, timezone
 from typing import Any
 
@@ -181,51 +183,70 @@ def _window_index(start: Any, end: Any) -> pd.DatetimeIndex:
 # --------------------------------------------------------------------------- #
 DEFAULT_CAPACITY_MW = 100.0  # installed wind capacity for the synthetic portfolio
 
+# Real windsim daily capacity-factor profiles (forecast / actual / cleared-bid), extracted
+# once from the windsim DuckDB and shipped as a small committed file. This is the "windsim
+# shape as the base"; the generator replays these and rolls them forward (no windsim install
+# and no DuckDB needed on a host).
+_PROFILES_PATH = Path(__file__).resolve().parent / "windsim_profiles.json"
+_PROFILES_CACHE: list[dict[str, Any]] | None = None
+
+
+def _load_profiles() -> list[dict[str, Any]]:
+    global _PROFILES_CACHE
+    if _PROFILES_CACHE is None:
+        try:
+            with _PROFILES_PATH.open("r", encoding="utf-8") as fh:
+                _PROFILES_CACHE = json.load(fh).get("days", [])
+        except Exception:
+            _PROFILES_CACHE = []
+    return _PROFILES_CACHE
+
 
 def generate_wind_portfolio(
     area: str, start: Any, end: Any, capacity_mw: float = DEFAULT_CAPACITY_MW
 ) -> pd.DataFrame:
     """Synthetic wind portfolio over [start, end): DAM position, forecast, actual delivery.
 
-    Models a single wind portfolio the way windsim would, but from code so the demo
-    needs no windsim install and no data files:
+    Replays REAL windsim daily capacity-factor profiles (``windsim_profiles.json``) so the
+    shapes match windsim, while staying self-contained (no windsim install, no DuckDB) and
+    rolling forward forever:
 
-    * a per-day weather regime sets the mean capacity factor;
-    * an AR(1) path within the day gives smooth, autocorrelated intraday variation;
-    * the **day-ahead committed** volume (DAM position) is a rougher day-ahead forecast,
-      the **generation forecast** is the latest (closer) forecast, and **actual delivery**
-      is the realised output. Their differences are the forecast errors that create the
-      imbalance the IaR measures.
+    * each delivery day deterministically picks a windsim profile (seeded by area + date)
+      with a small per-day scale jitter, so days vary but always look like real wind;
+    * **generation forecast** = windsim latest forecast, **actual delivery** = windsim
+      actual, **DAM position** = windsim cleared bid (falling back to the forecast on the
+      rare uncleared quarter so the committed position never reads exactly 0);
+    * the forecast-vs-actual gap is windsim's own forecast error - the imbalance the IaR
+      measures.
 
-    All quantities are MWh per 15-min MTU. Deterministic in ``(area, day)`` so a given
-    timestamp always returns the same values (consistent across calls and with prices).
-    Columns: ``timestamp`` (UTC), ``dam_mwh``, ``forecast_mwh``, ``actual_mwh``.
+    All quantities are MWh per 15-min MTU. Deterministic in ``(area, day)``. Columns:
+    ``timestamp`` (UTC), ``dam_mwh``, ``forecast_mwh``, ``actual_mwh``.
     """
     idx = _window_index(start, end)
     cap_mwh = capacity_mw * 0.25
+    profiles = _load_profiles()
     rows: list[dict[str, Any]] = []
-    for day, day_idx in pd.Series(idx, index=idx).groupby(idx.tz_convert(MARKET_TZ).date):
-        ts_list = list(day_idx)
-        n = len(ts_list)
-        rng = _rng(area, "wind", day)
-        regime = float(np.clip(0.10 + 0.70 * rng.beta(2.0, 2.0), 0.08, 0.85))  # daily mean CF
-        # AR(1) weather path -> autocorrelated intraday capacity factor.
-        phi = 0.93
-        eps = rng.normal(0.0, 0.06, n)
-        x = np.empty(n)
-        x[0] = rng.normal(0.0, 0.10)
-        for k in range(1, n):
-            x[k] = phi * x[k - 1] + eps[k]
-        cf = np.clip(regime + x, 0.02, 0.98)               # "true"/latest forecast CF
-        cf_actual = np.clip(cf + rng.normal(0.0, 0.05, n), 0.0, 1.0)   # realised
-        cf_da = np.clip(cf + rng.normal(0.0, 0.07, n), 0.0, 1.0)       # rougher day-ahead
-        for ts, c_fc, c_act, c_da in zip(ts_list, cf, cf_actual, cf_da):
-            rows.append({
-                "timestamp": ts,
-                "dam_mwh": float(c_da * cap_mwh),
-                "forecast_mwh": float(c_fc * cap_mwh),
-                "actual_mwh": float(c_act * cap_mwh),
-            })
+    if not profiles:  # defensive fallback: flat-ish profile (should not happen in the demo)
+        for ts in idx:
+            rows.append({"timestamp": ts, "dam_mwh": 0.4 * cap_mwh,
+                         "forecast_mwh": 0.4 * cap_mwh, "actual_mwh": 0.4 * cap_mwh})
+        return pd.DataFrame(rows, columns=["timestamp", "dam_mwh", "forecast_mwh", "actual_mwh"])
+
+    n_days = len(profiles)
+    local = idx.tz_convert(MARKET_TZ)
+    for ts, lt in zip(idx, local):
+        prof = profiles[_seed(area, "windsim-day", lt.date()) % n_days]
+        q = lt.hour * 4 + lt.minute // 15          # quarter-of-day 0..95
+        jit = 0.88 + 0.24 * (_rng(area, "windsim-jit", lt.date()).random())  # per-day scale
+        fc = prof["forecast_cf"][q]
+        ac = prof["actual_cf"][q]
+        dam = prof["dam_cf"][q] if prof["dam_cf"][q] > 0.001 else fc   # never exactly 0
+        rows.append({
+            "timestamp": ts,
+            "dam_mwh": float(np.clip(dam * jit, 0.0, 1.0) * cap_mwh),
+            "forecast_mwh": float(np.clip(fc * jit, 0.0, 1.0) * cap_mwh),
+            "actual_mwh": float(np.clip(ac * jit, 0.0, 1.0) * cap_mwh),
+        })
     return pd.DataFrame(rows, columns=["timestamp", "dam_mwh", "forecast_mwh", "actual_mwh"])
 
 
