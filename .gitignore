@@ -14,6 +14,7 @@ data/iar.db-wal
 data/iar.db-shm
 data/refresh.lock
 data/refresh.log
+data/limits_override.json
 data/cache/*
 data/uploads/*
 !data/cache/.gitkeep
