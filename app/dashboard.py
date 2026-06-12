@@ -121,10 +121,26 @@ _CSS = f"""
 
   div[data-testid="stPlotlyChart"] {{ background: #fff; border: 1px solid #ebedf0;
        border-radius: 14px; padding: 8px 6px; box-shadow: 0 2px 10px rgba(20,24,33,.05); }}
-  .stTabs [data-baseweb="tab-list"] {{ gap: 4px; }}
-  .stTabs [data-baseweb="tab"] {{ font-weight: 600; color: #2b3038; }}
-  .stTabs [data-baseweb="tab"] p {{ color: #2b3038 !important; }}
-  .stTabs [aria-selected="true"] p {{ color: {VOLUE_ORANGE} !important; }}
+  /* Evenly distributed, theme-coloured tab strip (pill segments in a white bar). */
+  .stTabs [data-baseweb="tab-list"] {{
+      display: flex; width: 100%; gap: 8px;
+      background: #ffffff; border: 1px solid #ebedf0; border-radius: 12px;
+      padding: 6px; margin-bottom: 10px; box-shadow: 0 2px 10px rgba(20,24,33,.05);
+  }}
+  .stTabs [data-baseweb="tab"] {{
+      flex: 1 1 0; justify-content: center; text-align: center;
+      border-radius: 9px; padding: 10px 8px; font-weight: 700; color: #2b3038;
+      background: transparent; transition: background .15s ease, color .15s ease;
+  }}
+  .stTabs [data-baseweb="tab"] p {{ color: inherit !important; font-weight: 700; }}
+  .stTabs [data-baseweb="tab"]:hover {{ background: #fff3ee; }}
+  .stTabs [aria-selected="true"] {{
+      background: linear-gradient(100deg, {VOLUE_ORANGE} 0%, #ff7a52 100%);
+      box-shadow: 0 2px 8px rgba(255,92,57,.28);
+  }}
+  .stTabs [aria-selected="true"] p {{ color: #ffffff !important; }}
+  /* Hide the default sliding underline / bottom border so the pills read cleanly. */
+  .stTabs [data-baseweb="tab-highlight"], .stTabs [data-baseweb="tab-border"] {{ display: none; }}
 
   /* ---- Usage tab ---- */
   .u-hero {{ background: linear-gradient(100deg, #ffffff, #fff6f2); border: 1px solid #ffd9cc;
