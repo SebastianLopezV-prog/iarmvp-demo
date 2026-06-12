@@ -90,14 +90,13 @@ The Monte Carlo engine samples price and imbalance independently, builds a P&L p
 and reads IaR/CIaR off the summed-P&L distribution. Results are stored in SQLite; the
 Streamlit UI reads only through a thin service layer.
 
-The synthetic feeds are the default. (For reference, the underlying product can instead use
-real Optimeering forecasts and prices when configured with `IAR_SYNTHETIC=0` plus credentials
-— not needed or included here.)
+This is a synthetic-only build: there is no real-feed code path and no API key. Every feed
+is generated in `iar/ingestion/synthetic.py`.
 
 ## Architecture
 
 Two principles: **the database is the integration hub** (components never call each other
-directly), and **feeds are synthetic by default** (swap to real ones with `IAR_SYNTHETIC=0`).
+directly), and **all feeds are synthetic** (there is no real-feed client in this demo).
 
 ```mermaid
 flowchart TB
@@ -110,7 +109,7 @@ flowchart TB
         PROF --> CLI
     end
 
-    FACT["Client factory - iar/ingestion/clients.py<br/>synthetic by default; IAR_SYNTHETIC=0 uses real Optimeering"]
+    FACT["Client factory - iar/ingestion/clients.py<br/>returns the synthetic clients (no real-feed path)"]
     CLI --> FACT
 
     subgraph L2["2 - Backend pipeline  (scripts)"]
@@ -164,7 +163,7 @@ app/        dashboard.py (Streamlit UI), data_source.py (read seam),
             bootstrap.py (self-seed + live forward-refresh)
 iar/
   ingestion/  synthetic.py (the market model + synthetic clients + wind generator),
-              clients.py (factory: synthetic by default), flatfile_loader.py,
+              clients.py (factory: synthetic only), flatfile_loader.py,
               windsim_profiles.json (real windsim shapes, replayed)
   simulation/ imbalance_model.py, price_sampler.py, engine.py, persistence.py
   risk/       realised_cost.py, replay.py, backtest.py (Kupiec), alerts.py, calibration.py

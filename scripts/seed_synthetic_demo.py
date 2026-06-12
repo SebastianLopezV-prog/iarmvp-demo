@@ -9,7 +9,7 @@ This is the one command to (re)build a fully synthetic demo database. It:
   4. runs one live forward IaR for the current day;
   5. runs the Kupiec backtest (Gross + Spread).
 
-All feeds come from ``iar.ingestion.synthetic`` via the ``IAR_SYNTHETIC`` default, so
+All feeds come from ``iar.ingestion.synthetic`` (this demo has no real-feed path), so
 nothing external is contacted. Run it after copying the demo, or any time you want a
 clean synthetic dataset.
 
@@ -31,8 +31,8 @@ PY = sys.executable
 
 
 def _run(script: str, *args: str) -> None:
-    """Run a pipeline script as a subprocess with synthetic feeds forced on."""
-    env = dict(os.environ, IAR_SYNTHETIC="1")
+    """Run a pipeline script as a subprocess."""
+    env = dict(os.environ)
     cmd = [PY, str(PROJECT_ROOT / "scripts" / script), *args]
     print(f"\n>>> {script} {' '.join(args)}")
     result = subprocess.run(cmd, cwd=str(PROJECT_ROOT), env=env)

@@ -2,8 +2,8 @@
 
 Covers the realised imbalance cost computation (gross + spread, sign convention,
 period sum, time-window filter, input intersection), the actual-imbalance-price
-ingestion sinks, the markets-client imbalance-price fetch (mocked SDK), the Kupiec
-POF test, and the end-to-end backtest (exceedance flagging + persistence).
+ingestion sinks, the Kupiec POF test, and the end-to-end backtest (exceedance
+flagging + persistence).
 
 The 3.2 vintage join (``estimate_for_period``) is tested in ``test_replay.py``.
 """
@@ -28,7 +28,6 @@ from iar.ingestion.flatfile_loader import (
     get_or_create_portfolio,
     store_actual_imbalance_price_records,
 )
-from iar.ingestion.markets_client import OptimeeringMarketsClient
 from iar.risk.backtest import (
     kupiec_pof,
     load_performance_records,
@@ -204,50 +203,7 @@ def test_store_actual_imbalance_prices_replace_dedupes(session):
     assert rows[0].price == 55.0
 
 
-# --------------------------------------------------------------------------- #
-# Markets client: realised imbalance price fetch (mocked SDK)
-# --------------------------------------------------------------------------- #
-class _FakeMarketsApi:
-    def __init__(self, series_items, market_items):
-        self._series_items = series_items
-        self._market_items = market_items
-        self.calls = {}
-
-    def get_market_series(self, **kwargs):
-        self.calls["get_market_series"] = kwargs
-        return {"items": self._series_items}
-
-    def get_market(self, **kwargs):
-        self.calls["get_market"] = kwargs
-        return {"items": self._market_items}
-
-
-def test_get_imbalance_prices_filters_and_normalises():
-    series = [{"id": 42, "market": "Imbalance", "series_type": "imbalance price", "publisher": "Nordpool"}]
-    datapoints = [
-        {"start": datetime(2026, 6, 8, 0, 0, tzinfo=timezone.utc), "value": 91.5},
-        {"start": datetime(2026, 6, 8, 0, 15, tzinfo=timezone.utc), "value": 88.0},
-    ]
-    api = _FakeMarketsApi(series, [{"series_id": 42, "datapoints": datapoints}])
-    client = OptimeeringMarketsClient(_api=api)
-
-    recs = client.get_imbalance_prices("NO2")
-    kw = api.calls["get_market_series"]
-    assert kw["market"] == ["Imbalance"]
-    assert kw["series_type"] == ["imbalance price"]
-    assert recs[0] == {
-        "price_area": "NO2",
-        "timestamp": "2026-06-08T00:00:00+00:00",
-        "eur_per_mwh": 91.5,
-    }
-    assert [r["timestamp"] for r in recs] == sorted(r["timestamp"] for r in recs)
-
-
-def test_get_imbalance_prices_no_series_raises():
-    api = _FakeMarketsApi([], [])
-    client = OptimeeringMarketsClient(_api=api)
-    with pytest.raises(LookupError, match="imbalance price"):
-        client.get_imbalance_prices("NO2")
+# (Markets-client fetch tests removed: this is a synthetic-only demo with no real-feed client.)
 
 
 # --------------------------------------------------------------------------- #

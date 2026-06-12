@@ -1,23 +1,16 @@
-"""Run the Monte Carlo IaR engine end-to-end and print the result.
+"""Run the Monte Carlo IaR engine end-to-end and print the result (SYNTHETIC demo).
 
-Wires together the Week-2 components with REAL market data:
-  * live Optimeering spread quantiles      -> QuantilePriceSampler (2.2)
-  * REAL DAM cleared (spot) price           -> internal MarketsApi (markets_client)
-  * a STUB wind portfolio                   -> ImbalanceModel       (2.1)
-  * independent Monte Carlo                 -> run_simulation       (2.3)
+Wires together the Week-2 components on synthetic feeds:
+  * synthetic spread quantiles   -> QuantilePriceSampler (2.2)
+  * synthetic DAM (spot) price   -> synthetic markets client
+  * wind portfolio from the DB   -> ImbalanceModel       (2.1)
+  * independent Monte Carlo      -> run_simulation       (2.3)
 
-and prints Gross/Spread IaR + CIaR.
+and prints Gross/Spread IaR + CIaR. All feeds are synthetic (iar/ingestion/synthetic.py
+via the clients factory) - no API key, no real data.
 
-What's real vs stub now:
-  * Imbalance-price SPREAD quantiles: LIVE (Optimeering public SDK).
-  * DAM (spot) price: LIVE (Optimeering INTERNAL SDK, DAM cleared price) — requires the
-    vendored optipyclient wheel (see docs/README.md). Falls back to a flat --dam-price
-    with a warning if unavailable.
-  * Portfolio (positions, generation): still a SYNTHETIC stub, so the absolute euro
-    figures remain illustrative until real portfolio files are loaded.
-
-The simulation runs over the MTUs where BOTH the live spread forecast AND a real DAM
-price exist (their intersection) — so Gross IaR uses genuine spot prices throughout.
+The simulation runs over the MTUs where the spread forecast, DAM price and positions all
+overlap.
 
 Usage:
     python scripts/run_iar.py
@@ -153,11 +146,9 @@ def main() -> None:
     n_mtus = len(keep)
 
     # DAM (spot) price
-    from iar.ingestion.clients import use_synthetic
     if dam_map:
         dam_price = np.array([dam_map[ft[i]] for i in keep])
-        dam_src = ("SYNTHETIC (demo market model)" if use_synthetic()
-                   else "LIVE (Optimeering DAM cleared price, internal SDK)")
+        dam_src = "SYNTHETIC (demo market model)"
     else:
         dam_price = np.full(n_mtus, args.dam_price)
         dam_src = f"flat {args.dam_price:.2f} EUR/MWh [STUB fallback]"
@@ -188,8 +179,7 @@ def main() -> None:
     print(bar)
     print(f"IaR Monte Carlo  |  area={args.area}  MTUs={n_mtus}  "
           f"scenarios={rep.n_scenarios:,}  confidence={rep.confidence:.0%}")
-    spread_src = "SYNTHETIC demo spread" if use_synthetic() else "LIVE Optimeering spread"
-    print(f"forecast vintage : {vintage}   ({spread_src})")
+    print(f"forecast vintage : {vintage}   (SYNTHETIC demo spread)")
     print(f"DAM spot price   : {dam_src}")
     print(f"portfolio        : {pf_src}")
     print(f"imbalance model  : {args.dist}, sigma={args.sigma_fraction:.0%} of capacity")
@@ -200,12 +190,8 @@ def main() -> None:
     print(bar)
     print("IaR = worst-case settlement cost at the confidence level (positive = cost).")
     print("CIaR = average cost in the worst (1 - confidence) tail.")
-    if use_synthetic():
-        print("NOTE: this is the DEMO build - spread, DAM spot, prices and positions are all "
-              "SYNTHETIC (no real data, no API key). See iar/ingestion/synthetic.py.")
-    else:
-        print("NOTE: live feeds in use (Optimeering); positions from loaded data; "
-              "only the imbalance sigma is a parametric stub.")
+    print("NOTE: this is the DEMO build - spread, DAM spot, prices and positions are all "
+          "SYNTHETIC (no real data, no API key). See iar/ingestion/synthetic.py.")
 
     if args.store:
         init_db()

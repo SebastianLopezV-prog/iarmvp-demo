@@ -15,7 +15,6 @@ dependencies = [
     "SQLAlchemy>=2.0",
     "streamlit",
     "plotly",
-    "optimeering",
     "python-dotenv",
     "tenacity",
     "openpyxl",          # Excel support for the flat-file loader

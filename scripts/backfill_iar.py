@@ -27,8 +27,7 @@ import pandas as pd
 
 from iar.db.models import DAMPosition, GenerationForecast, Portfolio
 from iar.db.session import DEFAULT_DB_PATH, get_session, init_db
-from iar.ingestion.markets_client import OptimeeringMarketsClient
-from iar.ingestion.optimeering_client import OptimeeringForecastClient
+from iar.ingestion.clients import get_forecast_client, get_markets_client
 from iar.risk.replay import MTU_HOURS, backfill_iar
 from iar.simulation.engine import EngineConfig
 from iar.simulation.imbalance_model import ImbalanceModelConfig
@@ -79,10 +78,10 @@ def main() -> None:
             "Run scripts/load_windsim_data.py first."
         )
 
-    forecast_records = OptimeeringForecastClient().get_historical_prices(
+    forecast_records = get_forecast_client().get_historical_prices(
         args.area, start=args.start, end=args.end
     )
-    dam_recs = OptimeeringMarketsClient().get_dam_prices(args.area, start=args.start, end=args.end)
+    dam_recs = get_markets_client().get_dam_prices(args.area, start=args.start, end=args.end)
     dam_map = {pd.to_datetime(r["timestamp"], utc=True): float(r["eur_per_mwh"]) for r in dam_recs}
 
     init_db()

@@ -11,7 +11,7 @@ Makes the demo self-contained and *living* on a host, where the database is abse
   refresh so new MTUs settle, the heatmap fills in, the IaR curve gains points and the
   "as of" clock advances. A short lock prevents concurrent viewers from stampeding.
 
-All work uses the synthetic feeds (``IAR_SYNTHETIC=1``), so nothing external is needed.
+All feeds are synthetic, so nothing external is needed.
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ _LOCK_TTL_SECONDS = 180
 
 
 def _run(script: str, *args: str) -> None:
-    env = dict(os.environ, IAR_SYNTHETIC="1")
+    env = dict(os.environ)
     # Make the `iar` package importable in the subprocess (and its grandchildren, which
     # inherit this env). On a host there is no editable install: the dashboard imports
     # `iar` via a sys.path tweak, but a child process does not inherit that - so without

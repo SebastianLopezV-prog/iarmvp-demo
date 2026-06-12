@@ -216,7 +216,7 @@ def backfill_iar(
         Portfolio to attach the runs to (must exist).
     forecast_records:
         Normalised imbalance-spread forecast records spanning multiple vintages
-        (e.g. from ``OptimeeringForecastClient.get_historical_prices``). Each dict
+        (e.g. from the synthetic forecast client's ``get_historical_prices``). Each dict
         has ``vintage_ts``, ``timestamp``, ``quantile``, ``value``.
     dam_price_map:
         ``{timestamp -> dam_price}`` (EUR/MWh); tz-aware or ISO, normalised to UTC.

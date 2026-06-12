@@ -2,6 +2,7 @@
 
 Modules
 -------
-- ``optimeering_client`` : wraps the Optimeering API (forecasts + historical actuals).
-- ``flatfile_loader``    : CSV/Excel loaders for DAM positions, generation forecasts, actuals.
+- ``synthetic``       : synthetic market model + drop-in forecast/markets clients + wind generator.
+- ``clients``         : factory returning the synthetic clients (this demo has no real-feed path).
+- ``flatfile_loader`` : CSV/Excel loaders for DAM positions, generation forecasts, actuals.
 """

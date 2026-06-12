@@ -175,13 +175,11 @@ def load_dam_prices(
     Unlike the position/generation/actual series (which are per *portfolio*), the
     DAM price is a per *price-area* market series, so it is keyed by ``price_area``
     rather than ``portfolio_id`` — matching the other price tables. Needed to turn
-    Optimeering's imbalance *spread* into an absolute price for Gross IaR.
+    the imbalance *spread* into an absolute price for Gross IaR.
 
-    This is the **flat-file** path (offline / other sources). The **real** NO2 spot
-    price now comes from Optimeering's internal ``MarketsApi`` (DAM cleared price) —
-    fetch it with ``markets_client.OptimeeringMarketsClient.get_dam_prices(...)`` and
-    persist with :func:`store_dam_price_records`. Both write the same source-agnostic
-    ``dam_prices`` table, so downstream code is unchanged regardless of source.
+    This is the **flat-file** path. In this demo the DAM spot price is produced by the
+    synthetic markets client and persisted via :func:`store_dam_price_records`; both
+    write the same source-agnostic ``dam_prices`` table, so downstream code is unchanged.
     """
     path = Path(path)
     df = _validate(_read_file(path), "eur_per_mwh", path)
@@ -204,7 +202,7 @@ def store_dam_price_records(
     records: list[dict],
     replace: bool = True,
 ) -> int:
-    """Persist DAM price records (e.g. from ``markets_client.get_dam_prices``).
+    """Persist DAM price records (e.g. from the synthetic markets client's ``get_dam_prices``).
 
     ``records`` are dicts with ``timestamp`` (ISO 8601) and ``eur_per_mwh``. Writes to
     the same ``dam_prices`` table as :func:`load_dam_prices`. With ``replace=True``
@@ -251,11 +249,10 @@ def load_actual_imbalance_prices(
     Week-3 backtest to reconstruct realised settlement cost. Like the other price
     series it is keyed by ``price_area`` (shared across portfolios), not portfolio.
 
-    This is the **flat-file** path (offline / other sources). The **real** price
-    comes from Optimeering's internal ``MarketsApi`` (imbalance price) — fetch with
-    ``markets_client.OptimeeringMarketsClient.get_imbalance_prices(...)`` and persist
-    with :func:`store_actual_imbalance_price_records`. Both write the same
-    source-agnostic ``actual_imbalance_prices`` table.
+    This is the **flat-file** path. In this demo the realised imbalance price is produced
+    by the synthetic markets client and persisted via
+    :func:`store_actual_imbalance_price_records`; both write the same source-agnostic
+    ``actual_imbalance_prices`` table.
     """
     path = Path(path)
     df = _validate(_read_file(path), "eur_per_mwh", path)
@@ -282,7 +279,7 @@ def store_actual_imbalance_price_records(
     records: list[dict],
     replace: bool = True,
 ) -> int:
-    """Persist realised imbalance prices (e.g. from ``markets_client.get_imbalance_prices``).
+    """Persist realised imbalance prices (e.g. from the synthetic markets client's ``get_imbalance_prices``).
 
     ``records`` are dicts with ``timestamp`` (ISO 8601) and ``eur_per_mwh``. Writes
     to the same ``actual_imbalance_prices`` table as :func:`load_actual_imbalance_prices`.

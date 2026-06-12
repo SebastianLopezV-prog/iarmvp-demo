@@ -61,7 +61,8 @@ def check_imports() -> None:
         "iar",
         "iar.db.models",
         "iar.db.session",
-        "iar.ingestion.optimeering_client",
+        "iar.ingestion.synthetic",
+        "iar.ingestion.clients",
         "iar.ingestion.flatfile_loader",
         "iar.simulation.imbalance_model",
         "iar.simulation.price_sampler",
@@ -175,26 +176,15 @@ def check_loaders(SessionLocal) -> None:
 
 
 # --------------------------------------------------------------------------- #
-# 1.3  Optimeering live fetch (best-effort)
+# 1.3  Synthetic forecast client
 # --------------------------------------------------------------------------- #
 def check_optimeering() -> None:
-    section("1.3  Optimeering client (live, best-effort)")
+    section("1.3  Synthetic forecast client")
     try:
-        from iar.ingestion.optimeering_client import (
-            MissingApiKeyError,
-            OptimeeringForecastClient,
-        )
+        from iar.ingestion.clients import get_forecast_client
+        client = get_forecast_client()
     except Exception as exc:  # noqa: BLE001
-        record("import client", Check.FAIL, str(exc))
-        return
-
-    try:
-        client = OptimeeringForecastClient()
-    except MissingApiKeyError:
-        record("live forecast fetch", Check.SKIP, "no OPTIMEERING_API_KEY in .env")
-        return
-    except Exception as exc:  # noqa: BLE001
-        record("construct client", Check.FAIL, str(exc))
+        record("construct synthetic client", Check.FAIL, str(exc))
         return
 
     try:

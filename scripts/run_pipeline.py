@@ -38,8 +38,7 @@ from iar.ingestion.flatfile_loader import (
     load_generation_forecasts,
     store_dam_price_records,
 )
-from iar.ingestion.markets_client import OptimeeringMarketsClient
-from iar.ingestion.optimeering_client import OptimeeringForecastClient
+from iar.ingestion.clients import get_forecast_client, get_markets_client
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 UPLOADS = PROJECT_ROOT / "data" / "uploads"
@@ -109,22 +108,18 @@ def run() -> None:
         n_dam = load_dam_positions(s, pid, FILES["dam"])
         n_gen = load_generation_forecasts(s, pid, FILES["gen"])
         n_act = load_actual_delivery(s, pid, FILES["act"])
-        # DAM (spot) price: REAL via the internal MarketsApi, fall back to the stub CSV.
-        try:
-            recs = OptimeeringMarketsClient().get_dam_prices(AREA, start="-P2D", end="P2D")
-            n_price = store_dam_price_records(s, AREA, recs)
-            dam_src = "LIVE (internal MarketsApi, DAM cleared price)"
-        except Exception as exc:  # noqa: BLE001 — optipyclient missing / auth / lookup
-            n_price = load_dam_prices(s, AREA, FILES["dam_price"])
-            dam_src = f"[STUB CSV fallback — {type(exc).__name__}]"
+        # DAM (spot) price: synthetic market model.
+        recs = get_markets_client().get_dam_prices(AREA, start="-P2D", end="P2D")
+        n_price = store_dam_price_records(s, AREA, recs)
+        dam_src = "SYNTHETIC (demo market model)"
         print(
             f"portfolio #{pid} '{pf.name}' ({pf.price_area}) | loaded [STUB portfolio] "
             f"DAM_pos(MWh)={n_dam}, forecast(MWh)={n_gen}, actual(MWh)={n_act} | "
             f"DAM_price(EUR/MWh)={n_price} rows {dam_src}"
         )
 
-        # --- real Optimeering price forecast ----------------------------- #
-        client = OptimeeringForecastClient()
+        # --- synthetic imbalance-price forecast -------------------------- #
+        client = get_forecast_client()
         records = client.get_imbalance_price_forecast(AREA)
         n_fc = _store_forecast(s, records)
         quantiles = sorted({r["quantile"] for r in records if r["quantile"] is not None})

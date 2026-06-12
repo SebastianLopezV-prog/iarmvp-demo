@@ -72,7 +72,7 @@ def load_prices(args) -> tuple[int, int]:
             n_imb = (load_actual_imbalance_prices(s, args.area, args.imbalance_csv)
                      if args.imbalance_csv else 0)
         else:
-            client = get_markets_client()  # synthetic by default (demo); real if IAR_SYNTHETIC=0
+            client = get_markets_client()  # synthetic (demo)
             dam = client.get_dam_prices(args.area, start=args.start, end=args.end)
             imb = client.get_imbalance_prices(args.area, start=args.start, end=args.end)
             # Upsert (replace=False): refresh only the fetched window, keep earlier
