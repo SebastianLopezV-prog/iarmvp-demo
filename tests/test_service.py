@@ -138,13 +138,13 @@ def test_get_alerts_returns_persisted_breaches(session):
 # --------------------------------------------------------------------------- #
 def test_get_limit_status_reports_severity_and_headroom(session):
     pf = get_or_create_portfolio(session, "Wind Co", "NO2 Wind", "NO2")
-    # Gross 60k breaches the default 50k remaining-day limit; spread 1k is within 40k.
-    _run(session, pf.portfolio_id, D1, gross_iar=60000, spread_iar=1000)
+    # Gross 4800 breaches the default 4000 remaining-day limit; spread 1000 is within 2800.
+    _run(session, pf.portfolio_id, D1, gross_iar=4800, spread_iar=1000)
     session.commit()
     df = service.get_limit_status(pf.portfolio_id, session=session)
     by_type = df.set_index("iar_type")
     assert by_type.loc["gross", "severity"] == "hard"
-    assert by_type.loc["gross", "limit_value"] == 50000
+    assert by_type.loc["gross", "limit_value"] == 4000
     assert by_type.loc["gross", "utilisation"] == pytest.approx(1.2)
     assert pd.isna(by_type.loc["spread", "severity"])  # within limit -> no severity
 

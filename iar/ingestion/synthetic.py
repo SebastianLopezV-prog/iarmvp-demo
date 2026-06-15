@@ -183,6 +183,12 @@ def _window_index(start: Any, end: Any) -> pd.DatetimeIndex:
 # --------------------------------------------------------------------------- #
 DEFAULT_CAPACITY_MW = 100.0  # installed wind capacity for the synthetic portfolio
 
+# Day-ahead forecast error as a fraction of capacity per MTU. Actual delivery = forecast +
+# this error, so the realised imbalance (and hence realised settlement cost) is on the same
+# realistic scale the engine assumes for its uncertainty (sigma ~ 10% of capacity). Matching
+# the two is what makes the backtest land near the ~5% target instead of a flat zero.
+FORECAST_ERROR_FRACTION = 0.10
+
 # Real windsim daily capacity-factor profiles (forecast / actual / cleared-bid), extracted
 # once from the windsim DuckDB and shipped as a small committed file. This is the "windsim
 # shape as the base"; the generator replays these and rolls them forward (no windsim install
@@ -239,13 +245,22 @@ def generate_wind_portfolio(
         q = lt.hour * 4 + lt.minute // 15          # quarter-of-day 0..95
         jit = 0.88 + 0.24 * (_rng(area, "windsim-jit", lt.date()).random())  # per-day scale
         fc = prof["forecast_cf"][q]
-        ac = prof["actual_cf"][q]
-        dam = prof["dam_cf"][q] if prof["dam_cf"][q] > 0.001 else fc   # never exactly 0
+        # DAM position = the day-ahead commitment, taken as the forecast, so the expected
+        # imbalance (position - forecast) ~ 0 and the IaR is a stable, positive number driven
+        # by genuine forecast-error uncertainty - not by windsim's uncontrolled day-by-day
+        # over/under-commitment (which otherwise flips the Gross IaR positive<->negative).
+        fc_mwh = float(np.clip(fc * jit, 0.0, 1.0) * cap_mwh)
+        # Actual delivery = forecast + a realistic day-ahead forecast error (~10% of capacity).
+        # windsim's own forecast-vs-actual gap is unrealistically tiny (~1% of capacity), which
+        # would make realised cost ~0 and the backtest dead; this puts the realised imbalance
+        # on the same scale the engine assumes, so the backtest is meaningful.
+        err = float(_rng(area, "ferr", ts.isoformat()).normal(0.0, FORECAST_ERROR_FRACTION * cap_mwh))
+        actual_mwh = float(np.clip(fc_mwh + err, 0.0, cap_mwh))
         rows.append({
             "timestamp": ts,
-            "dam_mwh": float(np.clip(dam * jit, 0.0, 1.0) * cap_mwh),
-            "forecast_mwh": float(np.clip(fc * jit, 0.0, 1.0) * cap_mwh),
-            "actual_mwh": float(np.clip(ac * jit, 0.0, 1.0) * cap_mwh),
+            "dam_mwh": fc_mwh,
+            "forecast_mwh": fc_mwh,
+            "actual_mwh": actual_mwh,
         })
     return pd.DataFrame(rows, columns=["timestamp", "dam_mwh", "forecast_mwh", "actual_mwh"])
 

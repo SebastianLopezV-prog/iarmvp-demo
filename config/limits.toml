@@ -2,15 +2,17 @@
 # Limits are set in EUR, per IaR variant (gross/spread), per limit type.
 # `default` applies unless a portfolio-specific section overrides it.
 
+# Calibrated to the demo's IaR scale so utilisation reads in a meaningful band (~50-70%),
+# with rare amber/breach on volatile days, and the per-MTU limit line sits on the chart.
 [default.gross]
-per_mtu_eur = 5000
-rolling_window_eur = 20000
-remaining_day_eur = 50000
+per_mtu_eur = 450
+rolling_window_eur = 1800
+remaining_day_eur = 4000
 
 [default.spread]
-per_mtu_eur = 4000
-rolling_window_eur = 15000
-remaining_day_eur = 40000
+per_mtu_eur = 250
+rolling_window_eur = 1000
+remaining_day_eur = 2800
 
 # Example portfolio override (keyed by portfolio name); extend as portfolios are added.
 # [portfolio."NO2 Wind".gross]

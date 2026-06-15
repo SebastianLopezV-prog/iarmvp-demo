@@ -50,8 +50,8 @@ def _run_with_iar(session, gross_iar, spread_iar, *, name="NO2 Wind", run_ts=VIN
 # --------------------------------------------------------------------------- #
 def test_load_limits_reads_defaults():
     cfg = load_limits()  # the real config/limits.toml
-    assert cfg.limit_for("anything", "gross", "remaining_day") == 50000
-    assert cfg.limit_for("anything", "spread", "per_mtu") == 4000
+    assert cfg.limit_for("anything", "gross", "remaining_day") == 4000
+    assert cfg.limit_for("anything", "spread", "per_mtu") == 250
 
 
 def test_limit_for_override_beats_default():
