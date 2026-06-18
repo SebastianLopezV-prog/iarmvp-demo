@@ -6,7 +6,10 @@ build-backend = "hatchling.build"
 name = "iar-mvp"
 description = "Imbalance at Risk (IaR) - synthetic demo for a wind portfolio."
 readme = "README.md"
-requires-python = ">=3.13"
+# Kept at >=3.11 (not >=3.13): the hosted Streamlit Cloud build installs on the platform's
+# Python, and a >=3.13 pin makes the uv build reject it ("Error installing requirements").
+# The synthetic demo's deps are all public wheels that support 3.11+, so this is safe.
+requires-python = ">=3.11"
 license = {file = "LICENSE.md"}
 keywords = []
 authors = [
