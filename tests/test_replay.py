@@ -1,6 +1,6 @@
 """IaR vintage replay + comparison join tests (Task 3.2)."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 from sqlalchemy.orm import sessionmaker
@@ -13,10 +13,10 @@ from iar.risk.replay import backfill_iar
 from iar.simulation.engine import EngineConfig
 
 # Two delivery days and their day-ahead vintages (noon the day before).
-D1 = datetime(2026, 6, 8, tzinfo=timezone.utc)
-D2 = datetime(2026, 6, 9, tzinfo=timezone.utc)
-V0 = datetime(2026, 6, 7, 12, tzinfo=timezone.utc)   # day-ahead for D1
-V1 = datetime(2026, 6, 8, 12, tzinfo=timezone.utc)   # day-ahead for D2
+D1 = datetime(2026, 6, 8, tzinfo=UTC)
+D2 = datetime(2026, 6, 9, tzinfo=UTC)
+V0 = datetime(2026, 6, 7, 12, tzinfo=UTC)  # day-ahead for D1
+V1 = datetime(2026, 6, 8, 12, tzinfo=UTC)  # day-ahead for D2
 
 FAST = EngineConfig(n_scenarios=2000, confidence=0.95, seed=42)
 PCT = [5.0, 50.0, 95.0]
@@ -65,8 +65,11 @@ def _two_day_setup(session):
     records = _forecast_records(V0, D1) + _forecast_records(V1, D2)
     dam_map, pos_map = _maps(D1, D2)
     runs = backfill_iar(
-        session, pf.portfolio_id,
-        forecast_records=records, dam_price_map=dam_map, position_map=pos_map,
+        session,
+        pf.portfolio_id,
+        forecast_records=records,
+        dam_price_map=dam_map,
+        position_map=pos_map,
         engine_config=FAST,
     )
     session.commit()
@@ -88,12 +91,13 @@ def test_backfill_stamps_dayahead_vintage_and_horizon(session):
     by_horizon = {r.results[0].horizon: r for r in runs}
     assert set(by_horizon) == {"2026-06-08", "2026-06-09"}
     # Each day is stamped with the vintage that *preceded* it.
-    assert by_horizon["2026-06-08"].vintage_ts.replace(tzinfo=timezone.utc) == V0
-    assert by_horizon["2026-06-09"].vintage_ts.replace(tzinfo=timezone.utc) == V1
+    assert by_horizon["2026-06-08"].vintage_ts.replace(tzinfo=UTC) == V0
+    assert by_horizon["2026-06-09"].vintage_ts.replace(tzinfo=UTC) == V1
 
 
 def test_backfill_records_period_bounds_in_config(session):
     import json
+
     _pf, runs = _two_day_setup(session)
     cfg = json.loads(runs[0].config_json)
     assert cfg["replay"] is True
@@ -110,8 +114,11 @@ def test_day_without_preceding_vintage_is_skipped(session):
     records = _forecast_records(intraday, D1)
     dam_map, pos_map = _maps(D1)
     runs = backfill_iar(
-        session, pf.portfolio_id,
-        forecast_records=records, dam_price_map=dam_map, position_map=pos_map,
+        session,
+        pf.portfolio_id,
+        forecast_records=records,
+        dam_price_map=dam_map,
+        position_map=pos_map,
         engine_config=FAST,
     )
     assert runs == []
@@ -124,11 +131,15 @@ def test_mtus_without_price_or_position_are_dropped(session):
     # Remove one MTU's DAM price -> only 3 MTUs usable.
     del dam_map[_day_mtus(D1, 4)[2]]
     runs = backfill_iar(
-        session, pf.portfolio_id,
-        forecast_records=records, dam_price_map=dam_map, position_map=pos_map,
+        session,
+        pf.portfolio_id,
+        forecast_records=records,
+        dam_price_map=dam_map,
+        position_map=pos_map,
         engine_config=FAST,
     )
     import json
+
     assert json.loads(runs[0].config_json)["n_mtus"] == 3
 
 
@@ -138,9 +149,13 @@ def test_backfill_is_idempotent(session):
     records = _forecast_records(V0, D1) + _forecast_records(V1, D2)
     dam_map, pos_map = _maps(D1, D2)
     backfill_iar(
-        session, pf.portfolio_id,
-        forecast_records=records, dam_price_map=dam_map, position_map=pos_map,
-        engine_config=FAST, replace=True,
+        session,
+        pf.portfolio_id,
+        forecast_records=records,
+        dam_price_map=dam_map,
+        position_map=pos_map,
+        engine_config=FAST,
+        replace=True,
     )
     session.commit()
     assert session.query(SimulationRun).count() == 2
@@ -149,17 +164,26 @@ def test_backfill_is_idempotent(session):
 def test_unknown_portfolio_raises(session):
     with pytest.raises(ValueError, match="does not exist"):
         backfill_iar(
-            session, 999,
-            forecast_records=[], dam_price_map={}, position_map={},
+            session,
+            999,
+            forecast_records=[],
+            dam_price_map={},
+            position_map={},
         )
 
 
 def test_no_records_returns_empty(session):
     pf = get_or_create_portfolio(session, "Wind Co", "NO2 Wind", "NO2")
-    assert backfill_iar(
-        session, pf.portfolio_id,
-        forecast_records=[], dam_price_map={}, position_map={},
-    ) == []
+    assert (
+        backfill_iar(
+            session,
+            pf.portfolio_id,
+            forecast_records=[],
+            dam_price_map={},
+            position_map={},
+        )
+        == []
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -168,12 +192,8 @@ def test_no_records_returns_empty(session):
 def test_join_picks_latest_vintage_at_or_before_period_start(session):
     pf, _ = _two_day_setup(session)
     # D1's period -> V0 estimate; D2's period -> V1 estimate.
-    assert estimate_for_period(session, pf.portfolio_id, D1).vintage_ts.replace(
-        tzinfo=timezone.utc
-    ) == V0
-    assert estimate_for_period(session, pf.portfolio_id, D2).vintage_ts.replace(
-        tzinfo=timezone.utc
-    ) == V1
+    assert estimate_for_period(session, pf.portfolio_id, D1).vintage_ts.replace(tzinfo=UTC) == V0
+    assert estimate_for_period(session, pf.portfolio_id, D2).vintage_ts.replace(tzinfo=UTC) == V1
 
 
 def test_join_returns_none_before_first_vintage(session):
@@ -184,7 +204,7 @@ def test_join_returns_none_before_first_vintage(session):
 def test_join_accepts_iso_string(session):
     pf, _ = _two_day_setup(session)
     run = estimate_for_period(session, pf.portfolio_id, "2026-06-09T00:00:00+00:00")
-    assert run.vintage_ts.replace(tzinfo=timezone.utc) == V1
+    assert run.vintage_ts.replace(tzinfo=UTC) == V1
 
 
 def test_iar_estimate_for_period_returns_typed_result(session):

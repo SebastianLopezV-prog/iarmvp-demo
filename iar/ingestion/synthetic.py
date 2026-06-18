@@ -35,8 +35,8 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from pathlib import Path
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -82,7 +82,7 @@ def _daily_regime(area: str, day: Any) -> float:
     """
     r = _rng(area, "regime", day)
     base = float(np.exp(r.normal(0.0, 0.45)))  # lognormal, median 1
-    if r.random() < 0.12:                       # ~1 day in 8 is a stress day
+    if r.random() < 0.12:  # ~1 day in 8 is a stress day
         base *= float(r.uniform(1.8, 3.0))
     return float(np.clip(base, 0.6, 4.0))
 
@@ -92,12 +92,12 @@ def dam_price(area: str, ts: pd.Timestamp) -> float:
     h = _local_hour(ts)
     shape = (
         38.0
-        + 9.0 * np.exp(-((h - 8.0) ** 2) / (2 * 1.8 ** 2))     # morning peak
-        + 13.0 * np.exp(-((h - 18.5) ** 2) / (2 * 2.2 ** 2))   # evening peak
-        - 7.0 * np.exp(-((h - 3.0) ** 2) / (2 * 2.2 ** 2))     # night trough
+        + 9.0 * np.exp(-((h - 8.0) ** 2) / (2 * 1.8**2))  # morning peak
+        + 13.0 * np.exp(-((h - 18.5) ** 2) / (2 * 2.2**2))  # evening peak
+        - 7.0 * np.exp(-((h - 3.0) ** 2) / (2 * 2.2**2))  # night trough
     )
     day = ts.tz_convert(MARKET_TZ).date()
-    level = float(_rng(area, "dam-level", day).normal(0.0, 7.0))     # per-day shift
+    level = float(_rng(area, "dam-level", day).normal(0.0, 7.0))  # per-day shift
     weekend = -5.0 if ts.tz_convert(MARKET_TZ).dayofweek >= 5 else 0.0
     noise = float(_rng(area, "dam-noise", ts.isoformat()).normal(0.0, 1.5))
     return float(max(shape + level + weekend + noise, -15.0))
@@ -110,12 +110,12 @@ def _spread_params(area: str, ts: pd.Timestamp) -> tuple[float, float, float, fl
     regime = _daily_regime(area, day)
     base_scale = (
         5.5
-        + 11.0 * np.exp(-((h - 18.5) ** 2) / (2 * 2.6 ** 2))   # evening volatility
-        + 4.0 * np.exp(-((h - 7.5) ** 2) / (2 * 2.0 ** 2))     # morning ramp
+        + 11.0 * np.exp(-((h - 18.5) ** 2) / (2 * 2.6**2))  # evening volatility
+        + 4.0 * np.exp(-((h - 7.5) ** 2) / (2 * 2.0**2))  # morning ramp
     )
     scale = base_scale * regime
-    loc = 1.0 + 2.5 * np.exp(-((h - 18.5) ** 2) / (2 * 3.0 ** 2))   # slight evening up-bias
-    scale_up = scale * 1.7   # up-regulation spikes are larger (system short, costly)
+    loc = 1.0 + 2.5 * np.exp(-((h - 18.5) ** 2) / (2 * 3.0**2))  # slight evening up-bias
+    scale_up = scale * 1.7  # up-regulation spikes are larger (system short, costly)
     scale_dn = scale * 1.0
     return float(loc), float(scale_dn), float(scale_up), 4.0
 
@@ -234,15 +234,21 @@ def generate_wind_portfolio(
     rows: list[dict[str, Any]] = []
     if not profiles:  # defensive fallback: flat-ish profile (should not happen in the demo)
         for ts in idx:
-            rows.append({"timestamp": ts, "dam_mwh": 0.4 * cap_mwh,
-                         "forecast_mwh": 0.4 * cap_mwh, "actual_mwh": 0.4 * cap_mwh})
+            rows.append(
+                {
+                    "timestamp": ts,
+                    "dam_mwh": 0.4 * cap_mwh,
+                    "forecast_mwh": 0.4 * cap_mwh,
+                    "actual_mwh": 0.4 * cap_mwh,
+                }
+            )
         return pd.DataFrame(rows, columns=["timestamp", "dam_mwh", "forecast_mwh", "actual_mwh"])
 
     n_days = len(profiles)
     local = idx.tz_convert(MARKET_TZ)
     for ts, lt in zip(idx, local):
         prof = profiles[_seed(area, "windsim-day", lt.date()) % n_days]
-        q = lt.hour * 4 + lt.minute // 15          # quarter-of-day 0..95
+        q = lt.hour * 4 + lt.minute // 15  # quarter-of-day 0..95
         jit = 0.88 + 0.24 * (_rng(area, "windsim-jit", lt.date()).random())  # per-day scale
         fc = prof["forecast_cf"][q]
         # DAM position = the day-ahead commitment, taken as the forecast, so the expected
@@ -254,14 +260,18 @@ def generate_wind_portfolio(
         # windsim's own forecast-vs-actual gap is unrealistically tiny (~1% of capacity), which
         # would make realised cost ~0 and the backtest dead; this puts the realised imbalance
         # on the same scale the engine assumes, so the backtest is meaningful.
-        err = float(_rng(area, "ferr", ts.isoformat()).normal(0.0, FORECAST_ERROR_FRACTION * cap_mwh))
+        err = float(
+            _rng(area, "ferr", ts.isoformat()).normal(0.0, FORECAST_ERROR_FRACTION * cap_mwh)
+        )
         actual_mwh = float(np.clip(fc_mwh + err, 0.0, cap_mwh))
-        rows.append({
-            "timestamp": ts,
-            "dam_mwh": fc_mwh,
-            "forecast_mwh": fc_mwh,
-            "actual_mwh": actual_mwh,
-        })
+        rows.append(
+            {
+                "timestamp": ts,
+                "dam_mwh": fc_mwh,
+                "forecast_mwh": fc_mwh,
+                "actual_mwh": actual_mwh,
+            }
+        )
     return pd.DataFrame(rows, columns=["timestamp", "dam_mwh", "forecast_mwh", "actual_mwh"])
 
 
@@ -291,10 +301,14 @@ def store_synthetic_portfolio(
     for _, r in df.iterrows():
         ts = r["timestamp"].to_pydatetime()
         session.add(DAMPosition(portfolio_id=pf.portfolio_id, timestamp=ts, mwh=r["dam_mwh"]))
-        session.add(GenerationForecast(portfolio_id=pf.portfolio_id, timestamp=ts,
-                                       forecast_mwh=r["forecast_mwh"]))
-        session.add(ActualDelivery(portfolio_id=pf.portfolio_id, timestamp=ts,
-                                   actual_mwh=r["actual_mwh"]))
+        session.add(
+            GenerationForecast(
+                portfolio_id=pf.portfolio_id, timestamp=ts, forecast_mwh=r["forecast_mwh"]
+            )
+        )
+        session.add(
+            ActualDelivery(portfolio_id=pf.portfolio_id, timestamp=ts, actual_mwh=r["actual_mwh"])
+        )
     session.flush()
     return pf, len(df)
 
@@ -322,23 +336,26 @@ class SyntheticForecastClient:
         now = pd.Timestamp.now(tz="UTC")
         vintage = pd.to_datetime(max_event_time, utc=True) if max_event_time else now
         start = vintage.floor("15min")
-        idx = pd.date_range(start, start + pd.Timedelta(hours=self.HORIZON_HOURS),
-                            freq="15min", inclusive="left")
+        idx = pd.date_range(
+            start, start + pd.Timedelta(hours=self.HORIZON_HOURS), freq="15min", inclusive="left"
+        )
         v_iso = vintage.isoformat()
         records: list[dict[str, Any]] = []
         for ts in idx:
             ts_iso = ts.isoformat()
             for lv, val in spread_quantiles(area, ts).items():
-                records.append({
-                    "price_area": area,
-                    "timestamp": ts_iso,
-                    "vintage_ts": v_iso,
-                    "statistic_type": "Quantile",
-                    "quantile": float(lv),
-                    "unit_type": unit_type,
-                    "resolution": resolution,
-                    "value": float(val),
-                })
+                records.append(
+                    {
+                        "price_area": area,
+                        "timestamp": ts_iso,
+                        "vintage_ts": v_iso,
+                        "statistic_type": "Quantile",
+                        "quantile": float(lv),
+                        "unit_type": unit_type,
+                        "resolution": resolution,
+                        "value": float(val),
+                    }
+                )
         return records
 
     def get_historical_prices(
@@ -358,16 +375,18 @@ class SyntheticForecastClient:
         for ts in idx:
             ts_iso = ts.isoformat()
             for lv, val in spread_quantiles(area, ts).items():
-                records.append({
-                    "price_area": area,
-                    "timestamp": ts_iso,
-                    "vintage_ts": ts_iso,
-                    "statistic_type": "Quantile",
-                    "quantile": float(lv),
-                    "unit_type": unit_type,
-                    "resolution": resolution,
-                    "value": float(val),
-                })
+                records.append(
+                    {
+                        "price_area": area,
+                        "timestamp": ts_iso,
+                        "vintage_ts": ts_iso,
+                        "statistic_type": "Quantile",
+                        "quantile": float(lv),
+                        "unit_type": unit_type,
+                        "resolution": resolution,
+                        "value": float(val),
+                    }
+                )
         return records
 
 
@@ -391,7 +410,10 @@ class SyntheticMarketsClient:
     ) -> list[dict[str, Any]]:
         """Realised (settled) absolute imbalance price records over [start, end)."""
         return [
-            {"price_area": area, "timestamp": ts.isoformat(),
-             "eur_per_mwh": realised_imbalance_price(area, ts)}
+            {
+                "price_area": area,
+                "timestamp": ts.isoformat(),
+                "eur_per_mwh": realised_imbalance_price(area, ts),
+            }
             for ts in _window_index(start, end)
         ]

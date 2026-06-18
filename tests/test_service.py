@@ -5,12 +5,13 @@ returns plain data (DataFrames/dicts) and hides ORM detail.
 """
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 
 import pandas as pd
 import pytest
 from sqlalchemy.orm import sessionmaker
 
+from iar import service
 from iar.db.models import (
     ActualDelivery,
     ActualImbalancePrice,
@@ -22,10 +23,9 @@ from iar.db.models import (
 from iar.db.session import init_db, make_engine
 from iar.ingestion.flatfile_loader import get_or_create_portfolio
 from iar.risk.alerts import LimitConfig, evaluate_run
-from iar import service
 
-D1 = datetime(2026, 6, 8, tzinfo=timezone.utc)
-D2 = datetime(2026, 6, 9, tzinfo=timezone.utc)
+D1 = datetime(2026, 6, 8, tzinfo=UTC)
+D2 = datetime(2026, 6, 9, tzinfo=UTC)
 
 
 @pytest.fixture
@@ -38,19 +38,43 @@ def session():
 
 def _run(session, pid, day, gross_iar, spread_iar, *, replay=True):
     vintage = day - timedelta(hours=12)
-    cfg = {"replay": replay,
-           "period_start": day.isoformat(),
-           "period_end": (day + timedelta(days=1)).isoformat(),
-           "n_mtus": 1}
-    run = SimulationRun(portfolio_id=pid, run_ts=vintage, vintage_ts=vintage,
-                        n_scenarios=5000, seed=42, config_json=json.dumps(cfg))
+    cfg = {
+        "replay": replay,
+        "period_start": day.isoformat(),
+        "period_end": (day + timedelta(days=1)).isoformat(),
+        "n_mtus": 1,
+    }
+    run = SimulationRun(
+        portfolio_id=pid,
+        run_ts=vintage,
+        vintage_ts=vintage,
+        n_scenarios=5000,
+        seed=42,
+        config_json=json.dumps(cfg),
+    )
     session.add(run)
     session.flush()
     h = day.date().isoformat()
-    session.add(IaRResult(run_id=run.run_id, confidence=0.95, horizon=h,
-                          iar_type="gross", iar_value=gross_iar, ciar_value=gross_iar + 100))
-    session.add(IaRResult(run_id=run.run_id, confidence=0.95, horizon=h,
-                          iar_type="spread", iar_value=spread_iar, ciar_value=spread_iar + 50))
+    session.add(
+        IaRResult(
+            run_id=run.run_id,
+            confidence=0.95,
+            horizon=h,
+            iar_type="gross",
+            iar_value=gross_iar,
+            ciar_value=gross_iar + 100,
+        )
+    )
+    session.add(
+        IaRResult(
+            run_id=run.run_id,
+            confidence=0.95,
+            horizon=h,
+            iar_type="spread",
+            iar_value=spread_iar,
+            ciar_value=spread_iar + 50,
+        )
+    )
     session.flush()
     return run
 
@@ -154,7 +178,12 @@ def test_get_limit_status_empty_without_runs(session):
     df = service.get_limit_status(pf.portfolio_id, session=session)
     assert df.empty
     assert list(df.columns) == [
-        "iar_type", "limit_type", "iar_value", "limit_value", "utilisation", "severity"
+        "iar_type",
+        "limit_type",
+        "iar_value",
+        "limit_value",
+        "utilisation",
+        "severity",
     ]
 
 
@@ -182,4 +211,5 @@ def test_get_backtest_summary_shape_and_values(session):
     assert set(summary["periods"]["period"]) == {"2026-06-08", "2026-06-09"}
     # read-only: nothing persisted
     from iar.db.models import HistoricalPerformanceRecord
+
     assert session.query(HistoricalPerformanceRecord).count() == 0

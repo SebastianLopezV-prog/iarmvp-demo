@@ -23,9 +23,7 @@ def test_sigma_capacity_basis_is_constant_fraction():
 
 def test_sigma_forecast_basis_scales_with_forecast_and_respects_floor():
     gen = np.array([0.0, 10.0, 50.0])
-    cfg = ImbalanceModelConfig(
-        sigma_fraction=0.1, scale_basis="forecast", sigma_floor_mwh=1.0
-    )
+    cfg = ImbalanceModelConfig(sigma_fraction=0.1, scale_basis="forecast", sigma_floor_mwh=1.0)
     m = ImbalanceModel.from_inputs(np.zeros(3), gen, capacity_mwh=100.0, config=cfg)
     # 0.1*[0,10,50] = [0,1,5] -> floored at 1 -> [1,1,5]
     np.testing.assert_allclose(m.sigma, np.array([1.0, 1.0, 5.0]))
@@ -45,8 +43,9 @@ def test_sample_shape_and_moments_normal():
 
 def test_student_t_std_matches_sigma():
     # The scaled-t must have std == sigma (scale shrunk by sqrt((df-2)/df)).
-    cfg = ImbalanceModelConfig(dist="student_t", student_df=5.0,
-                               sigma_fraction=0.1, scale_basis="capacity")
+    cfg = ImbalanceModelConfig(
+        dist="student_t", student_df=5.0, sigma_fraction=0.1, scale_basis="capacity"
+    )
     m = ImbalanceModel.from_inputs(np.zeros(3), np.zeros(3), capacity_mwh=100.0, config=cfg)
     draws = m.sample(200_000, rng=np.random.default_rng(1))
     np.testing.assert_allclose(draws.std(axis=0), m.sigma, rtol=0.05)  # sigma=10
@@ -62,8 +61,7 @@ def test_ppf_median_equals_mean_and_is_monotonic():
 
 
 def test_sample_is_seed_reproducible():
-    m = ImbalanceModel.from_inputs(np.array([1.0, 2.0]), np.array([0.0, 0.0]),
-                                   capacity_mwh=10.0)
+    m = ImbalanceModel.from_inputs(np.array([1.0, 2.0]), np.array([0.0, 0.0]), capacity_mwh=10.0)
     a = m.sample(1000, rng=np.random.default_rng(42))
     b = m.sample(1000, rng=np.random.default_rng(42))
     np.testing.assert_array_equal(a, b)

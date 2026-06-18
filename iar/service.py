@@ -25,8 +25,8 @@ Sign convention is the engine's throughout: IaR/CIaR and realised cost are in
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Iterator
 
 import pandas as pd
 from sqlalchemy.orm import Session
@@ -44,19 +44,19 @@ from iar.risk.backtest import run_backtest
 from iar.risk.realised_cost import compute_realised_cost
 
 __all__ = [
-    "list_portfolios",
-    "get_portfolio",
-    "get_latest_iar",
-    "get_iar_curve",
-    "get_limit_status",
-    "get_limit_overview",
-    "get_limit_settings",
-    "save_limit_settings",
-    "reset_limit_settings",
-    "get_intraday",
-    "get_realised_intraday",
     "get_alerts",
     "get_backtest_summary",
+    "get_iar_curve",
+    "get_intraday",
+    "get_latest_iar",
+    "get_limit_overview",
+    "get_limit_settings",
+    "get_limit_status",
+    "get_portfolio",
+    "get_realised_intraday",
+    "list_portfolios",
+    "reset_limit_settings",
+    "save_limit_settings",
 ]
 
 _LIMIT_TYPES = ("remaining_day", "rolling_window", "per_mtu")
@@ -87,8 +87,7 @@ def save_limit_settings(values: dict) -> None:
     the KPI utilisation, and the alert evaluation.
     """
     override = {
-        variant: {f"{lt}_eur": float(x) for lt, x in lts.items()}
-        for variant, lts in values.items()
+        variant: {f"{lt}_eur": float(x) for lt, x in lts.items()} for variant, lts in values.items()
     }
     LIMITS_OVERRIDE_PATH.parent.mkdir(parents=True, exist_ok=True)
     with LIMITS_OVERRIDE_PATH.open("w", encoding="utf-8") as fh:
@@ -130,8 +129,10 @@ def list_portfolios(*, session: Session | None = None) -> pd.DataFrame:
     with _scope(session) as s:
         rows = s.query(Portfolio).order_by(Portfolio.portfolio_id).all()
         return pd.DataFrame(
-            [{"portfolio_id": p.portfolio_id, "name": p.name, "price_area": p.price_area}
-             for p in rows],
+            [
+                {"portfolio_id": p.portfolio_id, "name": p.name, "price_area": p.price_area}
+                for p in rows
+            ],
             columns=["portfolio_id", "name", "price_area"],
         )
 
@@ -153,8 +154,7 @@ def get_portfolio(
         if portfolio_id is not None:
             pf = q.filter_by(portfolio_id=portfolio_id).one_or_none()
         else:
-            pf = (q.filter_by(price_area=area)
-                  .order_by(Portfolio.portfolio_id.desc()).first())
+            pf = q.filter_by(price_area=area).order_by(Portfolio.portfolio_id.desc()).first()
         if pf is None:
             return None
         return {"portfolio_id": pf.portfolio_id, "name": pf.name, "price_area": pf.price_area}
@@ -290,16 +290,33 @@ def get_limit_status(
                 }
                 for c in checks
             ],
-            columns=["iar_type", "limit_type", "iar_value", "limit_value", "utilisation", "severity"],
+            columns=[
+                "iar_type",
+                "limit_type",
+                "iar_value",
+                "limit_value",
+                "utilisation",
+                "severity",
+            ],
         )
 
 
 _INTRADAY_COLS = [
-    "timestamp", "gross_iar", "gross_ciar", "spread_iar", "spread_ciar",
-    "position_mwh", "expected_imbalance_mwh",
+    "timestamp",
+    "gross_iar",
+    "gross_ciar",
+    "spread_iar",
+    "spread_ciar",
+    "position_mwh",
+    "expected_imbalance_mwh",
 ]
 _LIMIT_OVERVIEW_COLS = [
-    "iar_type", "limit_type", "iar_value", "limit_value", "utilisation", "severity",
+    "iar_type",
+    "limit_type",
+    "iar_value",
+    "limit_value",
+    "utilisation",
+    "severity",
 ]
 
 

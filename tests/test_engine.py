@@ -102,7 +102,9 @@ def test_convergence_error_shrinks_with_more_scenarios():
         errs = []
         for seed in range(6):
             rep = run_simulation(
-                const_price(spread), normal_imbalance(mu, sigma), dam_price=dam,
+                const_price(spread),
+                normal_imbalance(mu, sigma),
+                dam_price=dam,
                 config=EngineConfig(n_scenarios=n, confidence=0.95, seed=seed),
             )
             errs.append(abs(rep.gross.iar - target))
@@ -113,9 +115,7 @@ def test_convergence_error_shrinks_with_more_scenarios():
 
 def test_seed_reproducibility():
     mu, sigma = np.array([1.0, -2.0, 0.5]), np.full(3, 2.0)
-    price = QuantilePriceSampler(
-        np.array([0.1, 0.5, 0.9]), np.tile([-5.0, 0.0, 8.0], (3, 1))
-    )
+    price = QuantilePriceSampler(np.array([0.1, 0.5, 0.9]), np.tile([-5.0, 0.0, 8.0], (3, 1)))
     args = (price, normal_imbalance(mu, sigma))
     cfg = EngineConfig(n_scenarios=20_000, seed=99)
     a = run_simulation(*args, dam_price=np.full(3, 30.0), config=cfg)
@@ -137,7 +137,9 @@ def test_summed_quantile_is_below_sum_of_per_mtu_iars():
     z = stats.norm.ppf(0.95)
 
     rep = run_simulation(
-        const_price(spread), normal_imbalance(mu, sigma), dam_price=dam,
+        const_price(spread),
+        normal_imbalance(mu, sigma),
+        dam_price=dam,
         config=EngineConfig(n_scenarios=300_000, confidence=0.95, seed=11),
     )
     # Naive (wrong) method: sum of per-MTU IaRs = mean + z * sum_t |k_t| sigma_t.
@@ -171,9 +173,7 @@ def test_copula_seam_is_swappable_without_a_copula_impl():
             u = rng.random((n, m))
             return u, u
 
-    price = QuantilePriceSampler(
-        np.array([0.05, 0.5, 0.95]), np.tile([-20.0, 0.0, 30.0], (4, 1))
-    )
+    price = QuantilePriceSampler(np.array([0.05, 0.5, 0.95]), np.tile([-20.0, 0.0, 30.0], (4, 1)))
     imb = normal_imbalance(np.full(4, 1.0), np.full(4, 3.0))
     dam = np.full(4, 25.0)
     cfg = EngineConfig(n_scenarios=200_000, seed=5)

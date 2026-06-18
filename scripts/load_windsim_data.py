@@ -51,18 +51,26 @@ def parse_args() -> argparse.Namespace:
     ap.add_argument("--windsim-portfolio", default="north", help="portfolio name in windsim")
     ap.add_argument("--area", default="NO2", help="our price area to file it under (NO1/NO2/SE3)")
     ap.add_argument("--user", default="Wind Co", help="our user/customer name")
-    ap.add_argument("--portfolio-name", default=None, help="our portfolio name (default '<area> Wind')")
+    ap.add_argument(
+        "--portfolio-name", default=None, help="our portfolio name (default '<area> Wind')"
+    )
     ap.add_argument("--days", type=int, default=4, help="number of days from the start to generate")
-    ap.add_argument("--start", default=None,
-                    help="windsim start date YYYY-MM-DD (default today; use a past date for history)")
+    ap.add_argument(
+        "--start",
+        default=None,
+        help="windsim start date YYYY-MM-DD (default today; use a past date for history)",
+    )
     ap.add_argument("--seed", type=int, default=1, help="windsim seed (deterministic)")
     ap.add_argument("--db", default=str(DEFAULT_DB), help="windsim DuckDB path")
-    ap.add_argument("--regen", action="store_true", help="regenerate the windsim DB even if present")
+    ap.add_argument(
+        "--regen", action="store_true", help="regenerate the windsim DB even if present"
+    )
     return ap.parse_args()
 
 
-def ensure_windsim_db(db_path: Path, days: int, seed: int, regen: bool,
-                      start_date: str | None = None) -> None:
+def ensure_windsim_db(
+    db_path: Path, days: int, seed: int, regen: bool, start_date: str | None = None
+) -> None:
     """Generate the windsim DuckDB for start..start+days if missing (or --regen)."""
     if db_path.exists() and not regen:
         return
@@ -73,8 +81,20 @@ def ensure_windsim_db(db_path: Path, days: int, seed: int, regen: bool,
     end = start + timedelta(days=days)
     print(f"Generating windsim data {start}..{end} (seed {seed}) -> {db_path}")
     subprocess.run(
-        [sys.executable, "-m", "windsim.cli", "run", "--db", str(db_path),
-         "--start", start.isoformat(), "--end", end.isoformat(), "--seed", str(seed)],
+        [
+            sys.executable,
+            "-m",
+            "windsim.cli",
+            "run",
+            "--db",
+            str(db_path),
+            "--start",
+            start.isoformat(),
+            "--end",
+            end.isoformat(),
+            "--seed",
+            str(seed),
+        ],
         check=True,
     )
 
@@ -99,17 +119,19 @@ def build_csvs(db_path: Path, windsim_pf: str, area: str) -> dict[str, Path]:
     fcs = [db.latest_forecast_for_quarter(windsim_pf, d) for d in days]
     acts = [db.get_actuals(windsim_pf, d) for d in days]
 
-    dam_pos = _quarter_mwh(bids, "cleared_mw")        # committed day-ahead volume (MWh)
-    gen = _quarter_mwh(fcs, "forecast_mw")            # latest forecast, summed over parks
-    act = _quarter_mwh(acts, "actual_mw")             # realised, summed over parks
+    dam_pos = _quarter_mwh(bids, "cleared_mw")  # committed day-ahead volume (MWh)
+    gen = _quarter_mwh(fcs, "forecast_mw")  # latest forecast, summed over parks
+    act = _quarter_mwh(acts, "actual_mw")  # realised, summed over parks
 
     UPLOADS.mkdir(parents=True, exist_ok=True)
 
     def _write(series: pd.Series, value_col: str, name: str) -> Path:
-        out = pd.DataFrame({
-            "timestamp": [ts.isoformat() for ts in series.index],
-            value_col: series.values.round(4),
-        })
+        out = pd.DataFrame(
+            {
+                "timestamp": [ts.isoformat() for ts in series.index],
+                value_col: series.values.round(4),
+            }
+        )
         path = UPLOADS / name
         out.to_csv(path, index=False)
         print(f"  wrote {path.name}  ({len(out)} rows)")
@@ -140,11 +162,15 @@ def main() -> None:
         n_gen = load_generation_forecasts(s, pf.portfolio_id, files["gen"])
         n_act = load_actual_delivery(s, pf.portfolio_id, files["act"])
         s.commit()
-        print(f"  portfolio #{pf.portfolio_id} '{pf.name}' ({pf.price_area}) | "
-              f"DAM_pos={n_dam}, forecast={n_gen}, actual={n_act} rows -> {DEFAULT_DB_PATH}")
+        print(
+            f"  portfolio #{pf.portfolio_id} '{pf.name}' ({pf.price_area}) | "
+            f"DAM_pos={n_dam}, forecast={n_gen}, actual={n_act} rows -> {DEFAULT_DB_PATH}"
+        )
 
-    print("\nDone. Positions/generation/actuals now come from REAL windsim data "
-          "(ingested via the client CSV path). [OK]")
+    print(
+        "\nDone. Positions/generation/actuals now come from REAL windsim data "
+        "(ingested via the client CSV path). [OK]"
+    )
 
 
 if __name__ == "__main__":

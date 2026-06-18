@@ -32,7 +32,7 @@ import json
 import subprocess
 import sys
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -79,18 +79,26 @@ def prune_live_runs() -> int:
 def parse_args() -> argparse.Namespace:
     ap = argparse.ArgumentParser(description="Refresh the IaR database (scheduled).")
     ap.add_argument("--areas", nargs="+", default=["NO2"])
-    ap.add_argument("--mode", choices=["fast", "full"], default="fast",
-                    help="fast = live run + actuals + backtest; full also backfills the curve")
-    ap.add_argument("--actuals-window", default="-P2D",
-                    help="how far back to pull realised prices each cycle (default 2 days)")
-    ap.add_argument("--backfill-window", default="-P3D",
-                    help="history window for --mode full backfill")
+    ap.add_argument(
+        "--mode",
+        choices=["fast", "full"],
+        default="fast",
+        help="fast = live run + actuals + backtest; full also backfills the curve",
+    )
+    ap.add_argument(
+        "--actuals-window",
+        default="-P2D",
+        help="how far back to pull realised prices each cycle (default 2 days)",
+    )
+    ap.add_argument(
+        "--backfill-window", default="-P3D", help="history window for --mode full backfill"
+    )
     return ap.parse_args()
 
 
 def main() -> None:
     args = parse_args()
-    started = datetime.now(timezone.utc)
+    started = datetime.now(UTC)
     print(f"[refresh] {started.isoformat()}  mode={args.mode}  areas={args.areas}")
 
     for area in args.areas:
@@ -107,7 +115,7 @@ def main() -> None:
         _run("run_backtest.py", "--area", area, "--basis", "both")
 
     pruned = prune_live_runs()
-    elapsed = (datetime.now(timezone.utc) - started).total_seconds()
+    elapsed = (datetime.now(UTC) - started).total_seconds()
     print(f"[refresh] done in {elapsed:.0f}s; pruned {pruned} stale live run(s).")
 
 

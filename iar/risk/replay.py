@@ -90,7 +90,8 @@ def _delivery_days(by_vintage: dict) -> list[pd.Timestamp]:
 def _pick_vintage(by_vintage: dict, day_start: pd.Timestamp, day_end: pd.Timestamp):
     """Most recent vintage at/before ``day_start`` that forecasts MTUs inside the day."""
     candidates = [
-        v for v, ts_map in by_vintage.items()
+        v
+        for v, ts_map in by_vintage.items()
         if v <= day_start and any(day_start <= ts < day_end for ts in ts_map)
     ]
     return max(candidates) if candidates else None
@@ -107,7 +108,7 @@ class PeriodEstimate:
 
     day_start: pd.Timestamp
     day_end: pd.Timestamp
-    horizon: str          # delivery day, ISO date (e.g. "2026-06-09")
+    horizon: str  # delivery day, ISO date (e.g. "2026-06-09")
     vintage: pd.Timestamp  # the day-ahead forecast event_time used
     n_mtus: int
     report: IaRReport
@@ -138,8 +139,7 @@ def estimate_periods(
     # Normalise the lookup maps to UTC keys once.
     dam_by_ts = {pd.to_datetime(t, utc=True): float(p) for t, p in dam_price_map.items()}
     pos_by_ts = {
-        pd.to_datetime(t, utc=True): (float(d), float(g))
-        for t, (d, g) in position_map.items()
+        pd.to_datetime(t, utc=True): (float(d), float(g)) for t, (d, g) in position_map.items()
     }
 
     by_vintage = _group_by_vintage(forecast_records)
@@ -153,7 +153,8 @@ def estimate_periods(
         ts_quantiles = by_vintage[vintage]
         # MTUs inside the day that we have a forecast, a DAM price, AND positions for.
         kept = sorted(
-            ts for ts in ts_quantiles
+            ts
+            for ts in ts_quantiles
             if day_start <= ts < day_end and ts in dam_by_ts and ts in pos_by_ts
         )
         if not kept:

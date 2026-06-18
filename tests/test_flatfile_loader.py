@@ -46,15 +46,10 @@ def test_load_three_series(session, portfolio, tmp_path):
     pid = portfolio.portfolio_id
     assert load_dam_positions(session, pid, _write_csv(tmp_path, "dam.csv", "mwh")) == 2
     assert (
-        load_generation_forecasts(
-            session, pid, _write_csv(tmp_path, "gen.csv", "forecast_mwh")
-        )
+        load_generation_forecasts(session, pid, _write_csv(tmp_path, "gen.csv", "forecast_mwh"))
         == 2
     )
-    assert (
-        load_actual_delivery(session, pid, _write_csv(tmp_path, "act.csv", "actual_mwh"))
-        == 2
-    )
+    assert load_actual_delivery(session, pid, _write_csv(tmp_path, "act.csv", "actual_mwh")) == 2
     assert session.query(DAMPosition).count() == 2
     assert session.query(GenerationForecast).count() == 2
     assert session.query(ActualDelivery).count() == 2
@@ -91,8 +86,8 @@ def test_store_dam_price_records_dedup_and_replace(session, portfolio):
         {"price_area": "NO2", "timestamp": "2026-06-08T12:30:00+00:00", "eur_per_mwh": 2.0},
     ]
     assert store_dam_price_records(session, "NO2", recs) == 1  # deduped to one timestamp
-    store_dam_price_records(session, "NO2", recs)              # replace=True default
-    assert session.query(DAMPrice).count() == 1               # not duplicated
+    store_dam_price_records(session, "NO2", recs)  # replace=True default
+    assert session.query(DAMPrice).count() == 1  # not duplicated
 
 
 def test_load_is_idempotent(session, portfolio, tmp_path):
@@ -114,9 +109,9 @@ def test_missing_column_rejected(session, portfolio, tmp_path):
 
 def test_duplicate_timestamp_rejected(session, portfolio, tmp_path):
     bad = tmp_path / "dupe.csv"
-    pd.DataFrame(
-        {"timestamp": ["2026-06-03T00:00:00+00:00"] * 2, "mwh": [1.0, 2.0]}
-    ).to_csv(bad, index=False)
+    pd.DataFrame({"timestamp": ["2026-06-03T00:00:00+00:00"] * 2, "mwh": [1.0, 2.0]}).to_csv(
+        bad, index=False
+    )
     with pytest.raises(FileValidationError, match="duplicate"):
         load_dam_positions(session, portfolio.portfolio_id, bad)
 

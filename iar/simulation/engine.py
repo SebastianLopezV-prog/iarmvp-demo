@@ -185,7 +185,7 @@ def _per_mtu_measures(cost_mtu: np.ndarray, confidence: float) -> tuple[np.ndarr
     in isolation, so the sum of these per-MTU IaRs overstates the diversified period
     risk (that gap is exactly the dashboard's "overperformance ratio").
     """
-    iar = np.quantile(cost_mtu, confidence, axis=0)            # (n_mtus,)
+    iar = np.quantile(cost_mtu, confidence, axis=0)  # (n_mtus,)
     tail_mask = cost_mtu >= iar[None, :]
     counts = tail_mask.sum(axis=0)
     ciar = np.where(
@@ -207,7 +207,7 @@ def _rolling_iar(cost_mtu: np.ndarray, confidence: float, window: int) -> float:
     w = min(window, n)
     worst = -np.inf
     for start in range(0, n - w + 1):
-        q = float(np.quantile(cost_mtu[:, start:start + w].sum(axis=1), confidence))
+        q = float(np.quantile(cost_mtu[:, start : start + w].sum(axis=1), confidence))
         worst = max(worst, q)
     return worst
 
@@ -246,14 +246,11 @@ def run_simulation(
     n_mtus = imbalance_model.n_mtus
     if price_sampler.n_mtus != n_mtus:
         raise ValueError(
-            f"MTU mismatch: price_sampler has {price_sampler.n_mtus}, "
-            f"imbalance_model has {n_mtus}"
+            f"MTU mismatch: price_sampler has {price_sampler.n_mtus}, imbalance_model has {n_mtus}"
         )
     dam_price = np.asarray(dam_price, dtype=float)
     if dam_price.shape != (n_mtus,):
-        raise ValueError(
-            f"dam_price must be 1-D length {n_mtus}, got shape {dam_price.shape}"
-        )
+        raise ValueError(f"dam_price must be 1-D length {n_mtus}, got shape {dam_price.shape}")
     if not np.all(np.isfinite(dam_price)):
         raise ValueError("dam_price contains non-finite values")
 
@@ -266,7 +263,7 @@ def run_simulation(
         raise ValueError("draw component returned uniforms of the wrong shape")
 
     # Marginals -> per-(scenario, MTU) draws.
-    spread = price_sampler.ppf(u_price)          # EUR vs spot
+    spread = price_sampler.ppf(u_price)  # EUR vs spot
     imbalance = imbalance_model.ppf(u_imbalance)  # MWh
     absolute_price = dam_price[None, :] + spread  # EUR/MWh
 

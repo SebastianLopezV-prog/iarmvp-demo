@@ -17,7 +17,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 
 import pandas as pd
 
@@ -46,12 +46,16 @@ def fetch_positions_map(area: str):
     init_db()
     with get_session() as s:
         pf = (
-            s.query(Portfolio).filter_by(price_area=area)
-            .order_by(Portfolio.portfolio_id.desc()).first()
+            s.query(Portfolio)
+            .filter_by(price_area=area)
+            .order_by(Portfolio.portfolio_id.desc())
+            .first()
         )
         if pf is None:
             return {}, None, None
-        dam = {r.timestamp: r.mwh for r in s.query(DAMPosition).filter_by(portfolio_id=pf.portfolio_id)}
+        dam = {
+            r.timestamp: r.mwh for r in s.query(DAMPosition).filter_by(portfolio_id=pf.portfolio_id)
+        }
         gen = {
             r.timestamp: r.forecast_mwh
             for r in s.query(GenerationForecast).filter_by(portfolio_id=pf.portfolio_id)
@@ -78,7 +82,7 @@ def main() -> None:
 
     # One day-ahead forecast vintage per day (max_event_time = that day's UTC start).
     fc = get_forecast_client()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     records: list[dict] = []
     for k in range(args.days, -1, -1):
         day_start = (now - timedelta(days=k)).replace(hour=0, minute=0, second=0, microsecond=0)
@@ -94,7 +98,8 @@ def main() -> None:
     init_db()
     with get_session() as s:
         runs = backfill_iar(
-            s, portfolio_id,
+            s,
+            portfolio_id,
             forecast_records=records,
             dam_price_map=dam_map,
             position_map=pos_map,
@@ -107,8 +112,10 @@ def main() -> None:
             ),
         )
         s.commit()
-        print(f"[stored] {len(runs)} day-ahead IaR estimate(s) for '{pf_name}' "
-              f"(#{portfolio_id}) -> {DEFAULT_DB_PATH}")
+        print(
+            f"[stored] {len(runs)} day-ahead IaR estimate(s) for '{pf_name}' "
+            f"(#{portfolio_id}) -> {DEFAULT_DB_PATH}"
+        )
 
 
 if __name__ == "__main__":

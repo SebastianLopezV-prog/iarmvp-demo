@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import argparse
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 
 import numpy as np
 import pandas as pd
@@ -45,15 +45,30 @@ def parse_args() -> argparse.Namespace:
     ap.add_argument("--scenarios", type=int, default=10_000, help="number of MC scenarios")
     ap.add_argument("--confidence", type=float, default=0.95, help="confidence level (0-1)")
     ap.add_argument("--capacity-mw", type=float, default=100.0, help="[STUB] installed capacity")
-    ap.add_argument("--sigma-fraction", type=float, default=0.10,
-                    help="[STUB] imbalance sigma as a fraction of per-MTU capacity")
-    ap.add_argument("--dam-price", type=float, default=45.0,
-                    help="fallback flat spot price EUR/MWh (only if the real DAM fetch fails)")
-    ap.add_argument("--dist", choices=["normal", "student_t"], default="normal",
-                    help="imbalance distribution shape")
+    ap.add_argument(
+        "--sigma-fraction",
+        type=float,
+        default=0.10,
+        help="[STUB] imbalance sigma as a fraction of per-MTU capacity",
+    )
+    ap.add_argument(
+        "--dam-price",
+        type=float,
+        default=45.0,
+        help="fallback flat spot price EUR/MWh (only if the real DAM fetch fails)",
+    )
+    ap.add_argument(
+        "--dist",
+        choices=["normal", "student_t"],
+        default="normal",
+        help="imbalance distribution shape",
+    )
     ap.add_argument("--seed", type=int, default=42, help="RNG seed (reproducibility)")
-    ap.add_argument("--store", action="store_true",
-                    help="persist the run to data/iar.db (SimulationRun + IaRResult)")
+    ap.add_argument(
+        "--store",
+        action="store_true",
+        help="persist the run to data/iar.db (SimulationRun + IaRResult)",
+    )
     return ap.parse_args()
 
 
@@ -78,9 +93,11 @@ def fetch_dam_map(area: str):
     """Return {pd.Timestamp(UTC): price} of the real DAM cleared price, or {} on failure."""
     try:
         recs = get_markets_client().get_dam_prices(area, start="-P1D", end="P3D")
-    except Exception as exc:  # noqa: BLE001 — optipyclient missing / auth / lookup
-        print(f"[warn] real DAM price unavailable ({type(exc).__name__}: "
-              f"{str(exc)[:120]}); falling back to flat --dam-price.")
+    except Exception as exc:
+        print(
+            f"[warn] real DAM price unavailable ({type(exc).__name__}: "
+            f"{str(exc)[:120]}); falling back to flat --dam-price."
+        )
         return {}
     return {pd.to_datetime(r["timestamp"], utc=True): float(r["eur_per_mwh"]) for r in recs}
 
@@ -97,19 +114,22 @@ def fetch_positions_map(area: str):
     init_db()
     with get_session() as s:
         pfs = (
-            s.query(Portfolio).filter_by(price_area=area)
-            .order_by(Portfolio.portfolio_id.desc()).all()
+            s.query(Portfolio)
+            .filter_by(price_area=area)
+            .order_by(Portfolio.portfolio_id.desc())
+            .all()
         )
         for pf in pfs:
-            dam = {r.timestamp: r.mwh
-                   for r in s.query(DAMPosition).filter_by(portfolio_id=pf.portfolio_id)}
-            gen = {r.timestamp: r.forecast_mwh
-                   for r in s.query(GenerationForecast).filter_by(portfolio_id=pf.portfolio_id)}
-            # SQLite returns naive UTC datetimes -> normalise to tz-aware UTC for alignment.
-            out = {
-                pd.to_datetime(t, utc=True): (dam[t], gen[t])
-                for t in (set(dam) & set(gen))
+            dam = {
+                r.timestamp: r.mwh
+                for r in s.query(DAMPosition).filter_by(portfolio_id=pf.portfolio_id)
             }
+            gen = {
+                r.timestamp: r.forecast_mwh
+                for r in s.query(GenerationForecast).filter_by(portfolio_id=pf.portfolio_id)
+            }
+            # SQLite returns naive UTC datetimes -> normalise to tz-aware UTC for alignment.
+            out = {pd.to_datetime(t, utc=True): (dam[t], gen[t]) for t in (set(dam) & set(gen))}
             if out:
                 return out, pf.name, pf.portfolio_id
         return {}, None, None
@@ -120,7 +140,7 @@ def stub_portfolio(n_mtus: int, capacity_mw: float, seed: int):
     rng = np.random.default_rng(seed)
     cap_mwh = capacity_mw * MTU_HOURS
     factor = np.clip(rng.normal(0.45, 0.12, n_mtus), 0.05, 0.95)
-    gen = factor * cap_mwh                                   # forecast generation
+    gen = factor * cap_mwh  # forecast generation
     dam_pos = np.clip(gen + rng.normal(0, 0.06 * cap_mwh, n_mtus), 0, cap_mwh)
     return dam_pos, gen
 
@@ -136,7 +156,8 @@ def main() -> None:
     #   live spread MTUs  ∩  (real DAM MTUs if any)  ∩  (real position MTUs if any).
     ft = pd.to_datetime(times, utc=True)
     keep = [
-        i for i, t in enumerate(ft)
+        i
+        for i, t in enumerate(ft)
         if (not dam_map or t in dam_map) and (not pos_map or t in pos_map)
     ]
     if not keep:
@@ -164,34 +185,44 @@ def main() -> None:
 
     price = QuantilePriceSampler.from_percentiles(pct, spread)
     imb = ImbalanceModel.from_inputs(
-        dam_pos, gen, capacity_mwh=args.capacity_mw * MTU_HOURS,
+        dam_pos,
+        gen,
+        capacity_mwh=args.capacity_mw * MTU_HOURS,
         config=ImbalanceModelConfig(
             dist=args.dist, sigma_fraction=args.sigma_fraction, scale_basis="capacity"
         ),
     )
 
     rep = run_simulation(
-        price, imb, dam_price,
+        price,
+        imb,
+        dam_price,
         EngineConfig(n_scenarios=args.scenarios, confidence=args.confidence, seed=args.seed),
     )
 
     bar = "=" * 64
     print(bar)
-    print(f"IaR Monte Carlo  |  area={args.area}  MTUs={n_mtus}  "
-          f"scenarios={rep.n_scenarios:,}  confidence={rep.confidence:.0%}")
+    print(
+        f"IaR Monte Carlo  |  area={args.area}  MTUs={n_mtus}  "
+        f"scenarios={rep.n_scenarios:,}  confidence={rep.confidence:.0%}"
+    )
     print(f"forecast vintage : {vintage}   (SYNTHETIC demo spread)")
     print(f"DAM spot price   : {dam_src}")
     print(f"portfolio        : {pf_src}")
     print(f"imbalance model  : {args.dist}, sigma={args.sigma_fraction:.0%} of capacity")
     print(bar)
     for name, m in (("GROSS ", rep.gross), ("SPREAD", rep.spread)):
-        print(f"{name} | IaR = {m.iar:+12,.0f} EUR   "
-              f"CIaR = {m.ciar:+12,.0f} EUR   mean = {m.mean:+12,.0f} EUR")
+        print(
+            f"{name} | IaR = {m.iar:+12,.0f} EUR   "
+            f"CIaR = {m.ciar:+12,.0f} EUR   mean = {m.mean:+12,.0f} EUR"
+        )
     print(bar)
     print("IaR = worst-case settlement cost at the confidence level (positive = cost).")
     print("CIaR = average cost in the worst (1 - confidence) tail.")
-    print("NOTE: this is the DEMO build - spread, DAM spot, prices and positions are all "
-          "SYNTHETIC (no real data, no API key). See iar/ingestion/synthetic.py.")
+    print(
+        "NOTE: this is the DEMO build - spread, DAM spot, prices and positions are all "
+        "SYNTHETIC (no real data, no API key). See iar/ingestion/synthetic.py."
+    )
 
     if args.store:
         init_db()
@@ -202,14 +233,21 @@ def main() -> None:
                 pf = s.get(Portfolio, pf_id)
             else:
                 pf = get_or_create_portfolio(s, "MC Runner", f"{args.area} Wind", args.area)
-            v = datetime.fromisoformat(vintage) if vintage else datetime.now(timezone.utc)
+            v = datetime.fromisoformat(vintage) if vintage else datetime.now(UTC)
             # Per-MTU IaR detail (read-off of the same run) for the dashboard panels.
             per_mtu = build_per_mtu(rep, [ft[i].isoformat() for i in keep], dam_pos, gen)
             run = persist_report(
-                s, rep, pf.portfolio_id, vintage_ts=v, horizon=f"{n_mtus}xPT15M",
-                extra_config={"area": args.area, "dist": args.dist,
-                              "sigma_fraction": args.sigma_fraction,
-                              "dam_source": dam_src},
+                s,
+                rep,
+                pf.portfolio_id,
+                vintage_ts=v,
+                horizon=f"{n_mtus}xPT15M",
+                extra_config={
+                    "area": args.area,
+                    "dist": args.dist,
+                    "sigma_fraction": args.sigma_fraction,
+                    "dam_source": dam_src,
+                },
                 per_mtu=per_mtu,
             )
             s.commit()
@@ -218,16 +256,21 @@ def main() -> None:
             # limits config must not fail the run.
             try:
                 from iar.risk.alerts import evaluate_latest
+
                 alerts = evaluate_latest(s, pf.portfolio_id)
                 s.commit()
-                alert_note = (f"{len(alerts)} alert(s): "
-                              + ", ".join(f"{a.severity}" for a in alerts)) if alerts \
+                alert_note = (
+                    (f"{len(alerts)} alert(s): " + ", ".join(f"{a.severity}" for a in alerts))
+                    if alerts
                     else "no limit breaches"
-            except Exception as exc:  # noqa: BLE001
+                )
+            except Exception as exc:
                 alert_note = f"alerts skipped ({type(exc).__name__})"
             print(bar)
-            print(f"[stored] SimulationRun #{run.run_id} (portfolio #{pf.portfolio_id}) "
-                  f"+ 2 IaRResult rows -> {DEFAULT_DB_PATH}")
+            print(
+                f"[stored] SimulationRun #{run.run_id} (portfolio #{pf.portfolio_id}) "
+                f"+ 2 IaRResult rows -> {DEFAULT_DB_PATH}"
+            )
             print(f"[alerts] {alert_note}")
 
 

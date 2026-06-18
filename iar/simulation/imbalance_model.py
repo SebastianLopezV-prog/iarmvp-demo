@@ -98,9 +98,7 @@ class ImbalanceModelConfig:
         if self.sigma_fraction <= 0:
             raise ValueError(f"sigma_fraction must be > 0, got {self.sigma_fraction}")
         if self.dist == "student_t" and self.student_df <= 2:
-            raise ValueError(
-                f"student_df must be > 2 for a finite variance, got {self.student_df}"
-            )
+            raise ValueError(f"student_df must be > 2 for a finite variance, got {self.student_df}")
         if self.sigma_floor_mwh < 0:
             raise ValueError(f"sigma_floor_mwh must be >= 0, got {self.sigma_floor_mwh}")
 
@@ -147,7 +145,7 @@ class ImbalanceModel:
         forecast_generation: np.ndarray,
         capacity_mwh: float,
         config: ImbalanceModelConfig | None = None,
-    ) -> "ImbalanceModel":
+    ) -> ImbalanceModel:
         """Build the model from per-MTU DAM position and forecast generation.
 
         Parameters
@@ -230,9 +228,7 @@ class ImbalanceModel:
         """
         u = np.asarray(u, dtype=float)
         if u.shape[-1] != self.n_mtus:
-            raise ValueError(
-                f"last axis of u ({u.shape[-1]}) must equal n_mtus ({self.n_mtus})"
-            )
+            raise ValueError(f"last axis of u ({u.shape[-1]}) must equal n_mtus ({self.n_mtus})")
         u = np.clip(u, _U_EPS, 1.0 - _U_EPS)
         scale = self._scale_param()
         if self._dist == "normal":

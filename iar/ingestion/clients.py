@@ -14,10 +14,12 @@ from typing import Any
 def get_forecast_client(**kwargs: Any):
     """Imbalance-spread forecast client (synthetic)."""
     from iar.ingestion.synthetic import SyntheticForecastClient
+
     return SyntheticForecastClient(**kwargs)
 
 
 def get_markets_client(**kwargs: Any):
     """Markets client for DAM spot + realised imbalance price (synthetic)."""
     from iar.ingestion.synthetic import SyntheticMarketsClient
+
     return SyntheticMarketsClient(**kwargs)

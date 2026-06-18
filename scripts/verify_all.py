@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import sys
 import traceback
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -74,14 +74,14 @@ def check_imports() -> None:
         try:
             importlib.import_module(mod)
             record(f"import {mod}", Check.PASS)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             record(f"import {mod}", Check.FAIL, str(exc))
 
 
 # --------------------------------------------------------------------------- #
 # 1.2  DB schema
 # --------------------------------------------------------------------------- #
-def check_schema() -> "object":
+def check_schema() -> object:
     """Build an in-memory DB; return a sessionmaker for later checks."""
     section("1.2  DB schema (in-memory)")
     from sqlalchemy import inspect
@@ -143,12 +143,8 @@ def check_loaders(SessionLocal) -> None:
             pid = pf.portfolio_id
             try:
                 n1 = load_dam_positions(s, pid, csv("dam.csv", "mwh", [10.0, 12.5]))
-                n2 = load_generation_forecasts(
-                    s, pid, csv("gen.csv", "forecast_mwh", [9.0, 11.0])
-                )
-                n3 = load_actual_delivery(
-                    s, pid, csv("act.csv", "actual_mwh", [8.5, 11.5])
-                )
+                n2 = load_generation_forecasts(s, pid, csv("gen.csv", "forecast_mwh", [9.0, 11.0]))
+                n3 = load_actual_delivery(s, pid, csv("act.csv", "actual_mwh", [8.5, 11.5]))
                 n4 = load_dam_prices(s, "NO2", csv("dam_price.csv", "eur_per_mwh", [40.0, 42.0]))
                 ok = (
                     n1 == n2 == n3 == n4 == 2
@@ -157,12 +153,14 @@ def check_loaders(SessionLocal) -> None:
                     and s.query(ActualDelivery).count() == 2
                     and s.query(DAMPrice).count() == 2
                 )
-                record("load 4 series (positions/forecast/actual/dam_price)",
-                       Check.PASS if ok else Check.FAIL)
+                record(
+                    "load 4 series (positions/forecast/actual/dam_price)",
+                    Check.PASS if ok else Check.FAIL,
+                )
                 # DAM price keyed by area, not portfolio
                 area_ok = {r.price_area for r in s.query(DAMPrice)} == {"NO2"}
                 record("dam_price keyed by area", Check.PASS if area_ok else Check.FAIL)
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 record("load 4 series", Check.FAIL, str(exc))
 
             # validation must reject a bad file
@@ -182,8 +180,9 @@ def check_optimeering() -> None:
     section("1.3  Synthetic forecast client")
     try:
         from iar.ingestion.clients import get_forecast_client
+
         client = get_forecast_client()
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         record("construct synthetic client", Check.FAIL, str(exc))
         return
 
@@ -195,7 +194,7 @@ def check_optimeering() -> None:
             f"live forecast fetch ({len(records)} rows, quantiles={quantiles})",
             Check.PASS if ok else Check.FAIL,
         )
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         record("live forecast fetch", Check.SKIP, f"network/API issue: {exc}")
 
 
@@ -206,15 +205,20 @@ def check_gross_reconstruction(SessionLocal) -> None:
     section("2.x unblocker  Gross price = DAM + spread")
     from iar.db.models import DAMPrice, ImbalancePriceForecast
 
-    t = datetime(2026, 6, 8, 12, 0, tzinfo=timezone.utc)
+    t = datetime(2026, 6, 8, 12, 0, tzinfo=UTC)
     with SessionLocal() as s:
         # store a DAM (spot) price and a P50 imbalance SPREAD for the same MTU
         s.add(DAMPrice(price_area="SE3", timestamp=t, price=50.0))
         s.add(
             ImbalancePriceForecast(
-                price_area="SE3", timestamp=t, vintage_ts=t,
-                statistic_type="Quantile", quantile=50.0,
-                unit_type="Price_Spread", resolution="PT15M", value=12.0,
+                price_area="SE3",
+                timestamp=t,
+                vintage_ts=t,
+                statistic_type="Quantile",
+                quantile=50.0,
+                unit_type="Price_Spread",
+                resolution="PT15M",
+                value=12.0,
             )
         )
         s.flush()
@@ -250,7 +254,7 @@ def main() -> int:
         check_loaders(SessionLocal)
         check_optimeering()
         check_gross_reconstruction(SessionLocal)
-    except Exception:  # noqa: BLE001 — unexpected harness error
+    except Exception:
         print("\nUNEXPECTED ERROR:")
         traceback.print_exc()
         return 2

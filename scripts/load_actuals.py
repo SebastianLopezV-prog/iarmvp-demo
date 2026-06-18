@@ -35,13 +35,13 @@ import argparse
 
 from iar.db.models import Portfolio
 from iar.db.session import DEFAULT_DB_PATH, get_session, init_db
+from iar.ingestion.clients import get_markets_client
 from iar.ingestion.flatfile_loader import (
     load_actual_imbalance_prices,
     load_dam_prices,
     store_actual_imbalance_price_records,
     store_dam_price_records,
 )
-from iar.ingestion.clients import get_markets_client
 from iar.risk.realised_cost import compute_realised_cost, realised_period_cost
 
 
@@ -50,17 +50,25 @@ def parse_args() -> argparse.Namespace:
     ap.add_argument("--area", default="NO2", help="price area (NO1/NO2/SE3)")
     ap.add_argument("--start", default="-P7D", help="window start (ISO datetime or duration)")
     ap.add_argument("--end", default="P0D", help="window end (ISO datetime or duration)")
-    ap.add_argument("--dam-csv", default=None,
-                    help="offline: load DAM price from this CSV instead of the SDK")
-    ap.add_argument("--imbalance-csv", default=None,
-                    help="offline: load actual imbalance price from this CSV instead of the SDK")
+    ap.add_argument(
+        "--dam-csv", default=None, help="offline: load DAM price from this CSV instead of the SDK"
+    )
+    ap.add_argument(
+        "--imbalance-csv",
+        default=None,
+        help="offline: load actual imbalance price from this CSV instead of the SDK",
+    )
     return ap.parse_args()
 
 
 def _portfolio(area: str):
     with get_session() as s:
-        pf = (s.query(Portfolio).filter_by(price_area=area)
-              .order_by(Portfolio.portfolio_id.desc()).first())
+        pf = (
+            s.query(Portfolio)
+            .filter_by(price_area=area)
+            .order_by(Portfolio.portfolio_id.desc())
+            .first()
+        )
         return (pf.portfolio_id, pf.name) if pf else (None, None)
 
 
@@ -69,8 +77,11 @@ def load_prices(args) -> tuple[int, int]:
     with get_session() as s:
         if args.dam_csv or args.imbalance_csv:
             n_dam = load_dam_prices(s, args.area, args.dam_csv) if args.dam_csv else 0
-            n_imb = (load_actual_imbalance_prices(s, args.area, args.imbalance_csv)
-                     if args.imbalance_csv else 0)
+            n_imb = (
+                load_actual_imbalance_prices(s, args.area, args.imbalance_csv)
+                if args.imbalance_csv
+                else 0
+            )
         else:
             client = get_markets_client()  # synthetic (demo)
             dam = client.get_dam_prices(args.area, start=args.start, end=args.end)
@@ -114,12 +125,16 @@ def main() -> None:
 
     if period["n_mtus"] == 0:
         print("No settled MTUs overlap (positions ∩ actuals ∩ DAM price ∩ imbalance price).")
-        print("Tip: realised imbalance prices are PAST-settled; generate windsim over a past\n"
-              "window so its MTUs overlap, then re-run with a matching --start/--end.")
+        print(
+            "Tip: realised imbalance prices are PAST-settled; generate windsim over a past\n"
+            "window so its MTUs overlap, then re-run with a matching --start/--end."
+        )
         return
 
-    print(f"settled MTUs : {period['n_mtus']}  "
-          f"({period['first_mtu']:%Y-%m-%d %H:%M} .. {period['last_mtu']:%Y-%m-%d %H:%M} UTC)")
+    print(
+        f"settled MTUs : {period['n_mtus']}  "
+        f"({period['first_mtu']:%Y-%m-%d %H:%M} .. {period['last_mtu']:%Y-%m-%d %H:%M} UTC)"
+    )
     print(f"Realised GROSS  cost : {period['gross']:+12,.0f} EUR")
     print(f"Realised SPREAD cost : {period['spread']:+12,.0f} EUR")
     print(bar)
@@ -127,8 +142,10 @@ def main() -> None:
     cols = ["timestamp", "imbalance_mwh", "actual_imbalance_price", "gross_cost", "spread_cost"]
     print(df[cols].head(8).to_string(index=False))
     print(bar)
-    print("Sign convention: imbalance = DAM position - actual delivery; "
-          "positive cost = bad. Feeds the 3.3 backtest (iar.risk.backtest.run_backtest).")
+    print(
+        "Sign convention: imbalance = DAM position - actual delivery; "
+        "positive cost = bad. Feeds the 3.3 backtest (iar.risk.backtest.run_backtest)."
+    )
 
 
 if __name__ == "__main__":

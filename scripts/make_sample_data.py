@@ -17,7 +17,7 @@ Run:  python scripts/make_sample_data.py
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 
 import numpy as np
@@ -27,15 +27,15 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 UPLOADS = PROJECT_ROOT / "data" / "uploads"
 
 # Portfolio assumptions (stub).
-CAPACITY_MW = 100.0          # installed wind capacity
-MTU_HOURS = 0.25             # 15-minute MTU
-N_MTU = 96                   # 24 hours
+CAPACITY_MW = 100.0  # installed wind capacity
+MTU_HOURS = 0.25  # 15-minute MTU
+N_MTU = 96  # 24 hours
 SEED = 42
 
 
 def _mtu_index() -> pd.DatetimeIndex:
     """96 fifteen-minute MTU starts beginning at the current UTC midnight."""
-    start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
     return pd.DatetimeIndex([start + timedelta(minutes=15 * i) for i in range(N_MTU)])
 
 
@@ -48,7 +48,7 @@ def generate() -> dict[str, pd.DataFrame]:
     factor = 0.45 + 0.25 * np.sin(2 * np.pi * (hours - 3) / 24.0)
     factor = np.clip(factor + rng.normal(0, 0.05, N_MTU), 0.05, 0.95)
 
-    forecast_mwh = CAPACITY_MW * factor * MTU_HOURS           # latest expected generation
+    forecast_mwh = CAPACITY_MW * factor * MTU_HOURS  # latest expected generation
     cap_mwh = CAPACITY_MW * MTU_HOURS
 
     # DAM position was committed day-ahead from an EARLIER forecast, so it differs
@@ -73,18 +73,14 @@ def generate() -> dict[str, pd.DataFrame]:
     ts = [t[:-2] + ":" + t[-2:] for t in ts]  # 0000 -> 00:00 ISO offset
 
     return {
-        "dam_positions_NO2.csv": pd.DataFrame(
-            {"timestamp": ts, "mwh": np.round(dam_mwh, 3)}
-        ),
+        "dam_positions_NO2.csv": pd.DataFrame({"timestamp": ts, "mwh": np.round(dam_mwh, 3)}),
         "generation_forecast_NO2.csv": pd.DataFrame(
             {"timestamp": ts, "forecast_mwh": np.round(forecast_mwh, 3)}
         ),
         "actual_delivery_NO2.csv": pd.DataFrame(
             {"timestamp": ts, "actual_mwh": np.round(actual_mwh, 3)}
         ),
-        "dam_price_NO2.csv": pd.DataFrame(
-            {"timestamp": ts, "eur_per_mwh": np.round(dam_price, 2)}
-        ),
+        "dam_price_NO2.csv": pd.DataFrame({"timestamp": ts, "eur_per_mwh": np.round(dam_price, 2)}),
     }
 
 

@@ -90,10 +90,10 @@ def test_from_percentiles_matches_probability_form():
 @pytest.mark.parametrize(
     "levels,values",
     [
-        (np.array([0.5]), np.array([[1.0]])),                  # <2 levels
-        (np.array([0.0, 0.5, 1.0]), np.zeros((1, 3))),         # levels at 0/1
-        (np.array([0.5, 0.25, 0.75]), np.zeros((1, 3))),       # not ascending
-        (np.array([0.1, 0.9]), np.zeros((1, 3))),              # shape mismatch
+        (np.array([0.5]), np.array([[1.0]])),  # <2 levels
+        (np.array([0.0, 0.5, 1.0]), np.zeros((1, 3))),  # levels at 0/1
+        (np.array([0.5, 0.25, 0.75]), np.zeros((1, 3))),  # not ascending
+        (np.array([0.1, 0.9]), np.zeros((1, 3))),  # shape mismatch
     ],
 )
 def test_validation_rejects_bad_inputs(levels, values):

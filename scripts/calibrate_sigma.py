@@ -43,13 +43,21 @@ def parse_args() -> argparse.Namespace:
 def fetch_positions_map(area: str):
     init_db()
     with get_session() as s:
-        pf = (s.query(Portfolio).filter_by(price_area=area)
-              .order_by(Portfolio.portfolio_id.desc()).first())
+        pf = (
+            s.query(Portfolio)
+            .filter_by(price_area=area)
+            .order_by(Portfolio.portfolio_id.desc())
+            .first()
+        )
         if pf is None:
             return {}, None, None
-        dam = {r.timestamp: r.mwh for r in s.query(DAMPosition).filter_by(portfolio_id=pf.portfolio_id)}
-        gen = {r.timestamp: r.forecast_mwh
-               for r in s.query(GenerationForecast).filter_by(portfolio_id=pf.portfolio_id)}
+        dam = {
+            r.timestamp: r.mwh for r in s.query(DAMPosition).filter_by(portfolio_id=pf.portfolio_id)
+        }
+        gen = {
+            r.timestamp: r.forecast_mwh
+            for r in s.query(GenerationForecast).filter_by(portfolio_id=pf.portfolio_id)
+        }
         pos = {pd.to_datetime(t, utc=True): (dam[t], gen[t]) for t in (set(dam) & set(gen))}
         return pos, pf.portfolio_id, pf.name
 
@@ -58,8 +66,10 @@ def main() -> None:
     args = parse_args()
     pos_map, pid, pf_name = fetch_positions_map(args.area)
     if not pos_map:
-        raise SystemExit(f"No portfolio with positions loaded for {args.area!r}. "
-                         "Run scripts/load_windsim_data.py first.")
+        raise SystemExit(
+            f"No portfolio with positions loaded for {args.area!r}. "
+            "Run scripts/load_windsim_data.py first."
+        )
 
     forecast_records = get_forecast_client().get_historical_prices(
         args.area, start=args.start, end=args.end
@@ -70,11 +80,15 @@ def main() -> None:
     init_db()
     with get_session() as s:
         res = calibrate_sigma(
-            s, pid,
-            forecast_records=forecast_records, dam_price_map=dam_map, position_map=pos_map,
+            s,
+            pid,
+            forecast_records=forecast_records,
+            dam_price_map=dam_map,
+            position_map=pos_map,
             capacity_mwh=args.capacity_mw * MTU_HOURS,
-            engine_config=EngineConfig(n_scenarios=args.scenarios,
-                                       confidence=args.confidence, seed=args.seed),
+            engine_config=EngineConfig(
+                n_scenarios=args.scenarios, confidence=args.confidence, seed=args.seed
+            ),
             iar_type=args.basis,
         )
 
@@ -92,11 +106,15 @@ def main() -> None:
     if res.recommended_sigma_fraction is None:
         print(res.note)
     else:
-        print(f"RECOMMENDED sigma_fraction = {res.recommended_sigma_fraction:.0%} "
-              f"(achieved rate {res.achieved_rate:.0%})")
+        print(
+            f"RECOMMENDED sigma_fraction = {res.recommended_sigma_fraction:.0%} "
+            f"(achieved rate {res.achieved_rate:.0%})"
+        )
         print(res.note)
-        print("Apply it: set [imbalance_model].sigma_fraction in config/app.toml "
-              "(or the dashboard slider).")
+        print(
+            "Apply it: set [imbalance_model].sigma_fraction in config/app.toml "
+            "(or the dashboard slider)."
+        )
 
 
 if __name__ == "__main__":

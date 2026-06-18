@@ -58,9 +58,7 @@ def get_or_create_portfolio(
         session.flush()
     portfolio = session.query(Portfolio).filter_by(user_id=user.user_id).one_or_none()
     if portfolio is None:
-        portfolio = Portfolio(
-            name=portfolio_name, price_area=price_area, user_id=user.user_id
-        )
+        portfolio = Portfolio(name=portfolio_name, price_area=price_area, user_id=user.user_id)
         session.add(portfolio)
         session.flush()
     return portfolio
@@ -79,9 +77,7 @@ def _read_file(path: str | Path) -> pd.DataFrame:
     elif suffix in (".xlsx", ".xls"):
         df = pd.read_excel(path)
     else:
-        raise FileValidationError(
-            f"Unsupported file type '{suffix}' (expected .csv/.xlsx): {path}"
-        )
+        raise FileValidationError(f"Unsupported file type '{suffix}' (expected .csv/.xlsx): {path}")
     df.columns = [str(c).strip() for c in df.columns]
     return df
 
@@ -91,8 +87,7 @@ def _validate(df: pd.DataFrame, value_col: str, path: Path) -> pd.DataFrame:
     missing = {"timestamp", value_col} - set(df.columns)
     if missing:
         raise FileValidationError(
-            f"{path.name}: missing required column(s) {sorted(missing)}; "
-            f"found {list(df.columns)}."
+            f"{path.name}: missing required column(s) {sorted(missing)}; found {list(df.columns)}."
         )
 
     ts = pd.to_datetime(df["timestamp"], utc=True, errors="coerce")
@@ -119,7 +114,7 @@ def _load_timeseries(
     portfolio_id: int,
     path: str | Path,
     value_col: str,
-    model: Type,
+    model: type,
     replace: bool,
 ) -> int:
     """Load a single-value time series file into ``model`` for ``portfolio_id``."""
@@ -159,9 +154,7 @@ def load_generation_forecasts(session, portfolio_id, path, replace: bool = True)
 
 def load_actual_delivery(session, portfolio_id, path, replace: bool = True) -> int:
     """Load actual delivery (``timestamp``, ``actual_mwh``)."""
-    return _load_timeseries(
-        session, portfolio_id, path, "actual_mwh", ActualDelivery, replace
-    )
+    return _load_timeseries(session, portfolio_id, path, "actual_mwh", ActualDelivery, replace)
 
 
 def load_dam_prices(
@@ -263,9 +256,7 @@ def load_actual_imbalance_prices(
         ).delete()
 
     rows = [
-        ActualImbalancePrice(
-            price_area=price_area, timestamp=ts.to_pydatetime(), price=float(val)
-        )
+        ActualImbalancePrice(price_area=price_area, timestamp=ts.to_pydatetime(), price=float(val))
         for ts, val in zip(df["timestamp"], df["eur_per_mwh"])
     ]
     session.add_all(rows)
@@ -298,8 +289,10 @@ def store_actual_imbalance_price_records(
             ActualImbalancePrice.price_area == price_area
         ).delete()
         session.add_all(
-            [ActualImbalancePrice(price_area=price_area, timestamp=ts, price=p)
-             for ts, p in by_ts.items()]
+            [
+                ActualImbalancePrice(price_area=price_area, timestamp=ts, price=p)
+                for ts, p in by_ts.items()
+            ]
         )
     elif by_ts:
         stmt = sqlite_insert(ActualImbalancePrice).values(

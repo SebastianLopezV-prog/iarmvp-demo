@@ -17,7 +17,7 @@ period to the estimate whose vintage precedes it.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 
 import numpy as np
 from sqlalchemy.orm import Session
@@ -105,7 +105,7 @@ def persist_report(
             "(the seed is stored so the run can be reproduced)."
         )
 
-    run_ts = run_ts or datetime.now(timezone.utc)
+    run_ts = run_ts or datetime.now(UTC)
     config = {
         "confidence": report.confidence,
         "n_scenarios": report.n_scenarios,

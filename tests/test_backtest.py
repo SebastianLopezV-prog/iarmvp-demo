@@ -9,7 +9,7 @@ The 3.2 vintage join (``estimate_for_period``) is tested in ``test_replay.py``.
 """
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 from sqlalchemy.orm import sessionmaker
@@ -35,7 +35,7 @@ from iar.risk.backtest import (
 )
 from iar.risk.realised_cost import compute_realised_cost, realised_period_cost
 
-T0 = datetime(2026, 6, 8, 0, 0, tzinfo=timezone.utc)
+T0 = datetime(2026, 6, 8, 0, 0, tzinfo=UTC)
 
 
 @pytest.fixture
@@ -53,9 +53,7 @@ def _mtu(i: int) -> datetime:
 def _seed_portfolio(session, area="NO2", *, positions, actuals, imb_prices, dam_prices):
     """Create a portfolio and insert aligned per-MTU inputs (lists, one per MTU)."""
     pf = get_or_create_portfolio(session, "Wind Co", f"{area} Wind", area)
-    for i, (pos, act, lam, spot) in enumerate(
-        zip(positions, actuals, imb_prices, dam_prices)
-    ):
+    for i, (pos, act, lam, spot) in enumerate(zip(positions, actuals, imb_prices, dam_prices)):
         ts = _mtu(i)
         session.add(DAMPosition(portfolio_id=pf.portfolio_id, timestamp=ts, mwh=pos))
         session.add(ActualDelivery(portfolio_id=pf.portfolio_id, timestamp=ts, actual_mwh=act))
@@ -252,22 +250,43 @@ def _insert_replay_run(session, pid, day_start, gross_iar, spread_iar, confidenc
     day_end = day_start + timedelta(days=1)
     vintage = day_start - timedelta(hours=12)
     run = SimulationRun(
-        portfolio_id=pid, run_ts=vintage, vintage_ts=vintage,
-        n_scenarios=5000, seed=42,
-        config_json=json.dumps({
-            "replay": True,
-            "period_start": day_start.isoformat(),
-            "period_end": day_end.isoformat(),
-            "n_mtus": 1,
-        }),
+        portfolio_id=pid,
+        run_ts=vintage,
+        vintage_ts=vintage,
+        n_scenarios=5000,
+        seed=42,
+        config_json=json.dumps(
+            {
+                "replay": True,
+                "period_start": day_start.isoformat(),
+                "period_end": day_end.isoformat(),
+                "n_mtus": 1,
+            }
+        ),
     )
     session.add(run)
     session.flush()
     horizon = day_start.date().isoformat()
-    session.add(IaRResult(run_id=run.run_id, confidence=confidence, horizon=horizon,
-                          iar_type="gross", iar_value=gross_iar, ciar_value=gross_iar))
-    session.add(IaRResult(run_id=run.run_id, confidence=confidence, horizon=horizon,
-                          iar_type="spread", iar_value=spread_iar, ciar_value=spread_iar))
+    session.add(
+        IaRResult(
+            run_id=run.run_id,
+            confidence=confidence,
+            horizon=horizon,
+            iar_type="gross",
+            iar_value=gross_iar,
+            ciar_value=gross_iar,
+        )
+    )
+    session.add(
+        IaRResult(
+            run_id=run.run_id,
+            confidence=confidence,
+            horizon=horizon,
+            iar_type="spread",
+            iar_value=spread_iar,
+            ciar_value=spread_iar,
+        )
+    )
     session.flush()
     return horizon
 
@@ -281,9 +300,9 @@ def _insert_realised(session, pid, area, day_start, *, dam_pos, actual, imb_pric
     session.flush()
 
 
-D1 = datetime(2026, 6, 8, tzinfo=timezone.utc)
-D2 = datetime(2026, 6, 9, tzinfo=timezone.utc)
-D3 = datetime(2026, 6, 10, tzinfo=timezone.utc)
+D1 = datetime(2026, 6, 8, tzinfo=UTC)
+D2 = datetime(2026, 6, 9, tzinfo=UTC)
+D3 = datetime(2026, 6, 10, tzinfo=UTC)
 
 
 def _three_day_backtest_setup(session):
@@ -294,9 +313,13 @@ def _three_day_backtest_setup(session):
     _insert_replay_run(session, pid, D2, gross_iar=500.0, spread_iar=300.0)
     _insert_replay_run(session, pid, D3, gross_iar=500.0, spread_iar=300.0)
     # D1 realised: short 20 MWh @ 100 -> gross 2000 > 500 -> EXCEEDED.
-    _insert_realised(session, pid, "NO2", D1, dam_pos=20.0, actual=0.0, imb_price=100.0, dam_price=40.0)
+    _insert_realised(
+        session, pid, "NO2", D1, dam_pos=20.0, actual=0.0, imb_price=100.0, dam_price=40.0
+    )
     # D2 realised: short 1 MWh @ 100 -> gross 100 < 500 -> within.
-    _insert_realised(session, pid, "NO2", D2, dam_pos=1.0, actual=0.0, imb_price=100.0, dam_price=40.0)
+    _insert_realised(
+        session, pid, "NO2", D2, dam_pos=1.0, actual=0.0, imb_price=100.0, dam_price=40.0
+    )
     # D3: no realised inputs -> not settled -> skipped.
     session.commit()
     return pid
@@ -305,8 +328,8 @@ def _three_day_backtest_setup(session):
 def test_backtest_flags_exceedances_and_skips_unsettled(session):
     pid = _three_day_backtest_setup(session)
     res = run_backtest(session, pid, "gross")
-    assert res.n_periods == 2          # D3 skipped (unsettled)
-    assert res.n_exceedances == 1      # only D1
+    assert res.n_periods == 2  # D3 skipped (unsettled)
+    assert res.n_exceedances == 1  # only D1
     by_period = {p.period: p for p in res.periods}
     assert by_period["2026-06-08"].exceeded is True
     assert by_period["2026-06-09"].exceeded is False

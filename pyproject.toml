@@ -1,32 +1,122 @@
 [build-system]
-requires = ["setuptools>=68"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project]
 name = "iar-mvp"
-version = "0.1.0"
-description = "Imbalance at Risk (IaR) MVP — local Monte Carlo PoC for a wind portfolio."
+description = "Imbalance at Risk (IaR) - synthetic demo for a wind portfolio."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.13"
+license = {file = "LICENSE.md"}
+keywords = []
+authors = [
+  { name = "Sebastian Lopez", email = "sebastian.lopez@volue.com" },
+]
+classifiers = [
+  "Private :: Do Not Upload",
+]
+dynamic = ["version"]
+
 dependencies = [
-    "numpy",
-    "pandas",
-    "scipy",
-    "SQLAlchemy>=2.0",
-    "streamlit",
-    "plotly",
-    "python-dotenv",
-    "tenacity",
-    "openpyxl",          # Excel support for the flat-file loader
+  "numpy",
+  "pandas",
+  "scipy",
+  "SQLAlchemy>=2.0",
+  "streamlit",
+  "plotly",
+  "python-dotenv",
+  "tenacity",
+  "openpyxl",  # Excel support for the flat-file loader
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
-    "pytest",
+  "pytest",
+  "pytest-cov",
+  "pytest-socket",  # disable network access during tests
+  "ruff",
+  "pre-commit",
 ]
 
-[tool.setuptools]
-packages = ["iar", "iar.db", "iar.ingestion", "iar.simulation", "iar.risk"]
+[project.urls]
+Documentation = "http://docs.wsight.org/"
+Source = "https://github.com/Volue/iarmvp-demo"
+
+[project.scripts]
+# Console entry point; prints how to launch the Streamlit dashboard.
+run = "iar.main:main"
+
+[tool.hatch.version]
+path = "iar/__about__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["iar"]
+
+[tool.hatch.build]
+# app/ and scripts/ are runtime entrypoints, not part of the importable wheel.
+exclude = ["/notebooks", "/data", "/reference", "/app", "/scripts"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+lint.select = [
+  "A", "ARG", "B", "C", "DTZ", "E", "EM", "F", "FBT", "I", "ICN", "ISC", "N",
+  "PLC", "PLE", "PLR", "PLW", "Q", "RUF", "S", "T", "TID", "UP", "W", "YTT",
+]
+lint.ignore = [
+  # --- cookiecutter defaults ---
+  "B027",
+  "FBT003",
+  "S105", "S106", "S107",
+  "C901", "PLR0911", "PLR0912", "PLR0913", "PLR0915",
+  "ISC001",
+  # --- pragmatic ignores for this PoC codebase (ruleset + format + safe fixes applied;
+  #     these categories are intentional or stylistic here and would risk behaviour to
+  #     rewrite wholesale; tighten over time) ---
+  "T201",                       # CLI scripts/dashboard print to console intentionally
+  "EM101", "EM102",             # exception-message string style
+  "PLC0415",                    # intentional lazy/local imports (clients factory, bootstrap)
+  "C408",                       # dict() calls
+  "RUF002", "RUF003",           # ambiguous unicode in docstrings/comments
+  "F401",                       # unused imports (gradual cleanup; some are re-exports)
+  "B905",                       # zip without explicit strict=
+  "E501",                       # long lines the formatter cannot wrap (strings/URLs)
+  "FBT001", "FBT002",           # boolean positional args in existing signatures
+  "ARG001", "ARG002",           # unused args (ABC / **kwargs / interface signatures)
+  "S603", "S110", "PLW1510",    # controlled subprocess + intentional try/except/pass
+  "PLR2004",                    # magic values in model/UI constants
+  "N803", "N806",               # math-style argument/variable names
+  "PLW0603",                    # module-level cache via global
+  "B904",                       # raise without from inside except
+  "DTZ011",                     # date.today() usage
+  "E402",                       # imports after sys.path setup (app entrypoints)
+  "F841", "PLW2901", "RUF007", "RUF043", "RUF046", "RUF059", "UP035",  # misc residual style
+]
+lint.unfixable = [
+  "F401",
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["iar"]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests may use magic values, asserts, and relative imports.
+"tests/**/*" = ["PLR2004", "S101", "TID252"]
+
+[tool.coverage.run]
+branch = true
+parallel = true
+omit = [
+  "iar/__about__.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+  "no cov",
+  "if __name__ == .__main__.:",
+  "if TYPE_CHECKING:",
+  "@abstractmethod",
+  "raise NotImplementedError",
+]

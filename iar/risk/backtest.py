@@ -110,7 +110,7 @@ class KupiecResult:
     expected_rate: float
     lr_statistic: float | None  # χ²(1); None if no observations
     p_value: float | None
-    reject_h0: bool | None      # True ⇒ calibration rejected at ``significance``
+    reject_h0: bool | None  # True ⇒ calibration rejected at ``significance``
     significance: float
 
     @property
@@ -228,11 +228,7 @@ class BacktestResult:
 
 def _replay_periods(session: Session, portfolio_id: int) -> dict[str, tuple[str, str]]:
     """``{delivery_day -> (period_start, period_end)}`` from stored replay runs."""
-    runs = (
-        session.query(SimulationRun)
-        .filter(SimulationRun.portfolio_id == portfolio_id)
-        .all()
-    )
+    runs = session.query(SimulationRun).filter(SimulationRun.portfolio_id == portfolio_id).all()
     periods: dict[str, tuple[str, str]] = {}
     for run in runs:
         cfg = json.loads(run.config_json or "{}")

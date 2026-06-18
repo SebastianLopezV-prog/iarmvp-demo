@@ -47,7 +47,7 @@ class CalibrationResult:
     n_periods: int
     recommended_sigma_fraction: float | None
     achieved_rate: float | None
-    grid: list[tuple[float, float | None]]   # (sigma_fraction, exceedance_rate)
+    grid: list[tuple[float, float | None]]  # (sigma_fraction, exceedance_rate)
     note: str
 
 
@@ -102,8 +102,10 @@ def calibrate_sigma(
         exceedances = 0
         for est in estimates:
             realised = realised_period_cost(
-                session, portfolio_id,
-                start=est.day_start.isoformat(), end=est.day_end.isoformat(),
+                session,
+                portfolio_id,
+                start=est.day_start.isoformat(),
+                end=est.day_end.isoformat(),
             )
             if realised["n_mtus"] == 0:
                 continue
@@ -118,10 +120,14 @@ def calibrate_sigma(
     scored = [(s, r) for s, r in grid_rates if r is not None]
     if not scored:
         return CalibrationResult(
-            iar_type=iar_type, target_rate=target_rate, n_periods=0,
-            recommended_sigma_fraction=None, achieved_rate=None, grid=grid_rates,
+            iar_type=iar_type,
+            target_rate=target_rate,
+            n_periods=0,
+            recommended_sigma_fraction=None,
+            achieved_rate=None,
+            grid=grid_rates,
             note="No settled periods to calibrate against — load realised prices "
-                 "(load_actuals.py) over a window that overlaps the positions.",
+            "(load_actuals.py) over a window that overlaps the positions.",
         )
 
     best_sigma, best_rate = min(scored, key=lambda sr: (abs(sr[1] - target_rate), sr[0]))
@@ -130,7 +136,11 @@ def calibrate_sigma(
         f"(rate moves in steps of 1/{n_periods_seen}); refine as history grows."
     )
     return CalibrationResult(
-        iar_type=iar_type, target_rate=target_rate, n_periods=n_periods_seen,
-        recommended_sigma_fraction=best_sigma, achieved_rate=best_rate,
-        grid=grid_rates, note=note,
+        iar_type=iar_type,
+        target_rate=target_rate,
+        n_periods=n_periods_seen,
+        recommended_sigma_fraction=best_sigma,
+        achieved_rate=best_rate,
+        grid=grid_rates,
+        note=note,
     )

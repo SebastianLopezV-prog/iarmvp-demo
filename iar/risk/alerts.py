@@ -34,7 +34,7 @@ from __future__ import annotations
 import json
 import tomllib
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 
 import pandas as pd
@@ -132,7 +132,7 @@ class LimitCheck:
     limit_type: str
     iar_value: float
     limit_value: float
-    utilisation: float       # iar_value / limit_value (1.0 = at the limit)
+    utilisation: float  # iar_value / limit_value (1.0 = at the limit)
     severity: str | None
 
 
@@ -198,7 +198,7 @@ def evaluate_run(
         alerts for this run's results, so re-evaluating is idempotent.
     """
     config = config or load_limits()
-    breach_ts = breach_ts or datetime.now(timezone.utc)
+    breach_ts = breach_ts or datetime.now(UTC)
     checks = check_run(run, config, limit_type, soft_ratio=soft_ratio)
 
     alerts = [
@@ -218,9 +218,9 @@ def evaluate_run(
         if replace:
             result_ids = [r.result_id for r in run.results]
             if result_ids:
-                session.query(Alert).filter(
-                    Alert.result_id.in_(result_ids)
-                ).delete(synchronize_session=False)
+                session.query(Alert).filter(Alert.result_id.in_(result_ids)).delete(
+                    synchronize_session=False
+                )
                 session.flush()
         session.add_all(alerts)
         session.flush()
@@ -252,8 +252,14 @@ def evaluate_latest(
     if run is None:
         return []
     return evaluate_run(
-        session, run, config, limit_type,
-        soft_ratio=soft_ratio, breach_ts=breach_ts, persist=persist, replace=replace,
+        session,
+        run,
+        config,
+        limit_type,
+        soft_ratio=soft_ratio,
+        breach_ts=breach_ts,
+        persist=persist,
+        replace=replace,
     )
 
 

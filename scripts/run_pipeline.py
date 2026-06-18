@@ -30,6 +30,7 @@ from iar.db.models import (
     ImbalancePriceForecast,
 )
 from iar.db.session import DEFAULT_DB_PATH, get_session, init_db
+from iar.ingestion.clients import get_forecast_client, get_markets_client
 from iar.ingestion.flatfile_loader import (
     get_or_create_portfolio,
     load_actual_delivery,
@@ -38,7 +39,6 @@ from iar.ingestion.flatfile_loader import (
     load_generation_forecasts,
     store_dam_price_records,
 )
-from iar.ingestion.clients import get_forecast_client, get_markets_client
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 UPLOADS = PROJECT_ROOT / "data" / "uploads"
@@ -149,15 +149,9 @@ def run() -> None:
             )
         }
         # DAM (spot) price, per area, from the flat file.
-        dam_price = {
-            r.timestamp: r.price
-            for r in s.query(DAMPrice).filter_by(price_area=AREA)
-        }
+        dam_price = {r.timestamp: r.price for r in s.query(DAMPrice).filter_by(price_area=AREA)}
         # Absolute imbalance price = DAM + spread -> enables GROSS settlement.
-        gross_price = {
-            t: dam_price[t] + p50_spread[t]
-            for t in set(dam_price) & set(p50_spread)
-        }
+        gross_price = {t: dam_price[t] + p50_spread[t] for t in set(dam_price) & set(p50_spread)}
 
         overlap = sorted(set(imbalance) & set(p50_spread))
         euro_spread = sum(imbalance[t] * p50_spread[t] for t in overlap)
@@ -191,7 +185,9 @@ def run() -> None:
             f"[STUB] Illustrative GROSS settlement over {len(gross_overlap)} overlapping MTUs: "
             f"{euro_gross:+,.0f} EUR"
         )
-        print("  (= [STUB] imbalance x ([STUB] DAM price + [LIVE] P50 spread); basis for Gross IaR.)")
+        print(
+            "  (= [STUB] imbalance x ([STUB] DAM price + [LIVE] P50 spread); basis for Gross IaR.)"
+        )
     if not overlap and not gross_overlap:
         print("\n(no timestamp overlap between positions and live forecast for a euro figure)")
     print("\nDone. Data persisted to the database. [OK]")

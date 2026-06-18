@@ -26,7 +26,7 @@ Sign convention (inherited from the engine): IaR / CIaR / realised cost are in
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 import numpy as np
@@ -47,6 +47,7 @@ def _to_local(value):
     if ts.tzinfo is None:
         ts = ts.tz_localize("UTC")
     return ts.tz_convert(DISPLAY_TZ)
+
 
 # Reuse the *real* Kupiec test even for synthetic data, so the demo's backtest
 # verdict is computed exactly the way the production path computes it.
@@ -121,14 +122,17 @@ class DataSource(ABC):
     # class implements them via iar.service for every source.
     def get_limit_settings(self) -> dict:
         from iar import service
+
         return service.get_limit_settings()
 
     def save_limit_settings(self, values: dict) -> None:
         from iar import service
+
         service.save_limit_settings(values)
 
     def reset_limit_settings(self) -> None:
         from iar import service
+
         service.reset_limit_settings()
 
 
@@ -267,7 +271,9 @@ class ServiceDataSource(DataSource):
                 }
             )
         if fc_part.empty and rl_part.empty:
-            return pd.DataFrame(columns=["timestamp", "forecast_iar", "realised_iar", "position_mwh"])
+            return pd.DataFrame(
+                columns=["timestamp", "forecast_iar", "realised_iar", "position_mwh"]
+            )
         merged = pd.merge(fc_part, rl_part, on="timestamp", how="outer").sort_values("timestamp")
         merged["timestamp"] = merged["timestamp"].dt.tz_convert(DISPLAY_TZ)
         return merged.reset_index(drop=True)
@@ -337,7 +343,8 @@ class ServiceDataSource(DataSource):
                     "title": f"{verb}: {str(a['iar_type']).capitalize()} {a['limit_type']}",
                     "body": (
                         f"IaR €{a['iar_value']:,.0f} vs limit €{a['limit_value']:,.0f}"
-                        if pd.notna(a["iar_value"]) else f"Limit €{a['limit_value']:,.0f}"
+                        if pd.notna(a["iar_value"])
+                        else f"Limit €{a['limit_value']:,.0f}"
                     ),
                     "severity": sev,
                 }
@@ -382,7 +389,7 @@ _DEMO_PORTFOLIOS = [
     (3, "SE3 Wind", "SE3"),
 ]
 # A fixed "as-of" so the demo is fully deterministic (no wall-clock dependence).
-_DEMO_NOW = datetime(2026, 6, 11, 14, 15, tzinfo=timezone.utc)
+_DEMO_NOW = datetime(2026, 6, 11, 14, 15, tzinfo=UTC)
 
 
 class DemoDataSource(DataSource):
@@ -424,7 +431,7 @@ class DemoDataSource(DataSource):
         n = MTUS_PER_DAY
         hours = np.arange(n) * (MTU_MINUTES / 60.0)
         # Afternoon-peaking risk shape (evening wind ramp + price volatility), max ≈ 1.
-        shape = 0.32 + 0.68 * np.exp(-((hours - 15.5) ** 2) / (2 * 3.2 ** 2))
+        shape = 0.32 + 0.68 * np.exp(-((hours - 15.5) ** 2) / (2 * 3.2**2))
         peak = self._current(portfolio_id, basis, "per_mtu", confidence)
         noise = rng.normal(1.0, 0.04, n).clip(0.85, 1.0)  # keep the series max ≈ peak
         forecast = peak * shape * noise
@@ -614,7 +621,7 @@ class DemoDataSource(DataSource):
             "portfolio_id": portfolio_id,
             "iar_type": basis,
             "confidence": confidence,
-            "n_periods": int(len(pdf)),
+            "n_periods": len(pdf),
             "n_exceedances": int(pdf["exceeded"].sum()),
             "observed_rate": k.observed_rate,
             "expected_rate": k.expected_rate,

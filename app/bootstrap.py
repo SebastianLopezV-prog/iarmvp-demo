@@ -20,7 +20,7 @@ import os
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -47,7 +47,9 @@ def _run(script: str, *args: str) -> None:
     env["PYTHONPATH"] = str(PROJECT_ROOT) + (os.pathsep + existing if existing else "")
     subprocess.run(
         [sys.executable, str(PROJECT_ROOT / "scripts" / script), *args],
-        cwd=str(PROJECT_ROOT), env=env, check=False,
+        cwd=str(PROJECT_ROOT),
+        env=env,
+        check=False,
     )
 
 
@@ -62,8 +64,8 @@ def _latest_run_ts():
 
 
 def _age_minutes(ts) -> float:
-    lt = ts if ts.tzinfo else ts.replace(tzinfo=timezone.utc)
-    return (datetime.now(timezone.utc) - lt).total_seconds() / 60.0
+    lt = ts if ts.tzinfo else ts.replace(tzinfo=UTC)
+    return (datetime.now(UTC) - lt).total_seconds() / 60.0
 
 
 def ensure_demo_data() -> str:
@@ -73,8 +75,15 @@ def ensure_demo_data() -> str:
     except Exception:
         latest = None
     if latest is None:
-        _run("seed_synthetic_demo.py", "--area", "NO2",
-             "--days", BOOT_SEED_DAYS, "--scenarios", BOOT_SEED_SCENARIOS)
+        _run(
+            "seed_synthetic_demo.py",
+            "--area",
+            "NO2",
+            "--days",
+            BOOT_SEED_DAYS,
+            "--scenarios",
+            BOOT_SEED_SCENARIOS,
+        )
         return "seeded"
     return "ok"
 
@@ -99,7 +108,7 @@ def maybe_advance() -> str:
     try:
         if _LOCK.exists() and (time.time() - _LOCK.stat().st_mtime) < _LOCK_TTL_SECONDS:
             return "locked"
-        _LOCK.write_text(datetime.now(timezone.utc).isoformat())
+        _LOCK.write_text(datetime.now(UTC).isoformat())
     except Exception:
         pass
 

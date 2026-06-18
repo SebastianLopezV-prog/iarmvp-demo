@@ -94,9 +94,7 @@ class QuantilePriceSampler:
         if np.any(np.diff(levels) <= 0):
             raise ValueError("quantile_levels must be strictly ascending")
         if values.ndim != 2 or values.shape[1] != levels.size:
-            raise ValueError(
-                f"quantile_values must be (n_mtus, {levels.size}); got {values.shape}"
-            )
+            raise ValueError(f"quantile_values must be (n_mtus, {levels.size}); got {values.shape}")
         if not np.all(np.isfinite(values)):
             raise ValueError("quantile_values contain non-finite entries")
         if tail not in ("linear", "clamp"):
@@ -116,7 +114,7 @@ class QuantilePriceSampler:
         percentile_levels: np.ndarray,
         quantile_values: np.ndarray,
         tail: TailPolicy = "linear",
-    ) -> "QuantilePriceSampler":
+    ) -> QuantilePriceSampler:
         """Build from percentile levels (e.g. ``[1, 5, ..., 99]``) instead of (0, 1)."""
         return cls(np.asarray(percentile_levels, dtype=float) / 100.0, quantile_values, tail)
 
@@ -147,9 +145,7 @@ class QuantilePriceSampler:
         """
         u = np.asarray(u, dtype=float)
         if u.shape[-1] != self.n_mtus:
-            raise ValueError(
-                f"last axis of u ({u.shape[-1]}) must equal n_mtus ({self.n_mtus})"
-            )
+            raise ValueError(f"last axis of u ({u.shape[-1]}) must equal n_mtus ({self.n_mtus})")
         u = np.clip(u, _U_EPS, 1.0 - _U_EPS)
         if self._tail == "clamp":
             # Restrict to the supported range -> flat tails (truncation).
@@ -165,11 +161,11 @@ class QuantilePriceSampler:
         x1 = levels[k + 1]
         # Gather per-MTU knot values: result[..., m] uses column m of `values`.
         # Move MTU axis to front for take_along_axis, then move back.
-        k_m = np.moveaxis(k, -1, 0)              # (n_mtus, ...)
+        k_m = np.moveaxis(k, -1, 0)  # (n_mtus, ...)
         flat_idx = k_m.reshape(self.n_mtus, -1)  # (n_mtus, K)
         y0 = np.take_along_axis(self._values, flat_idx, axis=1).reshape(k_m.shape)
         y1 = np.take_along_axis(self._values, flat_idx + 1, axis=1).reshape(k_m.shape)
-        y0 = np.moveaxis(y0, 0, -1)              # back to (..., n_mtus)
+        y0 = np.moveaxis(y0, 0, -1)  # back to (..., n_mtus)
         y1 = np.moveaxis(y1, 0, -1)
 
         slope = (y1 - y0) / (x1 - x0)

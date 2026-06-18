@@ -1,6 +1,6 @@
 """Sigma calibration tests (Option 1)."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 from sqlalchemy.orm import sessionmaker
@@ -26,7 +26,7 @@ def session():
 
 
 def _day(i: int) -> datetime:
-    return datetime(2026, 6, 8, tzinfo=timezone.utc) + timedelta(days=i)
+    return datetime(2026, 6, 8, tzinfo=UTC) + timedelta(days=i)
 
 
 def _forecast_records(days):
@@ -35,8 +35,14 @@ def _forecast_records(days):
     for d in days:
         vintage = (d - timedelta(hours=12)).isoformat()
         for q in PCT:
-            recs.append({"vintage_ts": vintage, "timestamp": d.isoformat(),
-                         "quantile": q, "value": SPREAD[q]})
+            recs.append(
+                {
+                    "vintage_ts": vintage,
+                    "timestamp": d.isoformat(),
+                    "quantile": q,
+                    "value": SPREAD[q],
+                }
+            )
     return recs
 
 
@@ -66,8 +72,13 @@ def test_exceedance_rate_decreases_with_sigma(session):
     # Four days with increasing realised cost (100, 200, 400, 800 EUR).
     pid, fr, dam, pos = _setup(session, [2.5, 5.0, 10.0, 20.0])
     res = calibrate_sigma(
-        session, pid, forecast_records=fr, dam_price_map=dam, position_map=pos,
-        engine_config=FAST, iar_type="gross",
+        session,
+        pid,
+        forecast_records=fr,
+        dam_price_map=dam,
+        position_map=pos,
+        engine_config=FAST,
+        iar_type="gross",
     )
     assert res.n_periods == 4
     rates = [r for _s, r in res.grid if r is not None]
@@ -82,23 +93,41 @@ def test_exceedance_rate_decreases_with_sigma(session):
 def test_recommendation_is_closest_to_target(session):
     pid, fr, dam, pos = _setup(session, [2.5, 5.0, 10.0, 20.0])
     res = calibrate_sigma(
-        session, pid, forecast_records=fr, dam_price_map=dam, position_map=pos,
-        engine_config=FAST, iar_type="gross",
+        session,
+        pid,
+        forecast_records=fr,
+        dam_price_map=dam,
+        position_map=pos,
+        engine_config=FAST,
+        iar_type="gross",
     )
     assert res.target_rate == pytest.approx(0.05)
     # The achieved rate must be the grid rate closest to the target.
-    best = min((r for _s, r in res.grid if r is not None),
-               key=lambda r: abs(r - res.target_rate))
+    best = min((r for _s, r in res.grid if r is not None), key=lambda r: abs(r - res.target_rate))
     assert res.achieved_rate == pytest.approx(best)
     assert res.recommended_sigma_fraction in [s for s, _r in res.grid]
 
 
 def test_higher_target_allows_smaller_sigma(session):
     pid, fr, dam, pos = _setup(session, [2.5, 5.0, 10.0, 20.0])
-    low = calibrate_sigma(session, pid, forecast_records=fr, dam_price_map=dam,
-                          position_map=pos, engine_config=FAST, target_rate=0.05)
-    high = calibrate_sigma(session, pid, forecast_records=fr, dam_price_map=dam,
-                           position_map=pos, engine_config=FAST, target_rate=0.50)
+    low = calibrate_sigma(
+        session,
+        pid,
+        forecast_records=fr,
+        dam_price_map=dam,
+        position_map=pos,
+        engine_config=FAST,
+        target_rate=0.05,
+    )
+    high = calibrate_sigma(
+        session,
+        pid,
+        forecast_records=fr,
+        dam_price_map=dam,
+        position_map=pos,
+        engine_config=FAST,
+        target_rate=0.50,
+    )
     # Tolerating more breaches (higher target) needs no more conservatism.
     assert high.recommended_sigma_fraction <= low.recommended_sigma_fraction
 
@@ -110,8 +139,14 @@ def test_no_settled_periods_returns_none(session):
     fr = _forecast_records(days)
     dam = {d.isoformat(): 40.0 for d in days}
     pos = {d.isoformat(): (0.0, 0.0) for d in days}
-    res = calibrate_sigma(session, pf.portfolio_id, forecast_records=fr,
-                          dam_price_map=dam, position_map=pos, engine_config=FAST)
+    res = calibrate_sigma(
+        session,
+        pf.portfolio_id,
+        forecast_records=fr,
+        dam_price_map=dam,
+        position_map=pos,
+        engine_config=FAST,
+    )
     assert res.n_periods == 0
     assert res.recommended_sigma_fraction is None
     assert "No settled periods" in res.note
@@ -119,14 +154,26 @@ def test_no_settled_periods_returns_none(session):
 
 def test_custom_grid_is_used(session):
     pid, fr, dam, pos = _setup(session, [5.0, 5.0])
-    res = calibrate_sigma(session, pid, forecast_records=fr, dam_price_map=dam,
-                          position_map=pos, engine_config=FAST,
-                          sigma_grid=(0.05, 0.10, 0.20))
+    res = calibrate_sigma(
+        session,
+        pid,
+        forecast_records=fr,
+        dam_price_map=dam,
+        position_map=pos,
+        engine_config=FAST,
+        sigma_grid=(0.05, 0.10, 0.20),
+    )
     assert [s for s, _r in res.grid] == [0.05, 0.10, 0.20]
 
 
 def test_bad_iar_type_raises(session):
     pf = get_or_create_portfolio(session, "Wind Co", "NO2 Wind", "NO2")
     with pytest.raises(ValueError, match="gross.*spread"):
-        calibrate_sigma(session, pf.portfolio_id, forecast_records=[],
-                        dam_price_map={}, position_map={}, iar_type="net")
+        calibrate_sigma(
+            session,
+            pf.portfolio_id,
+            forecast_records=[],
+            dam_price_map={},
+            position_map={},
+            iar_type="net",
+        )

@@ -16,9 +16,9 @@ Usage
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator
 
 from sqlalchemy import Engine, create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
@@ -42,13 +42,13 @@ def _enable_sqlite_fk(engine: Engine) -> None:
     """
 
     @event.listens_for(engine, "connect")
-    def _set_pragma(dbapi_connection, _connection_record):  # noqa: ANN001
+    def _set_pragma(dbapi_connection, _connection_record):
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA foreign_keys=ON")
         cursor.execute("PRAGMA busy_timeout=5000")
         try:
             cursor.execute("PRAGMA journal_mode=WAL")
-        except Exception:  # noqa: BLE001 -- e.g. in-memory DB; harmless
+        except Exception:
             pass
         cursor.close()
 
@@ -71,9 +71,7 @@ def make_engine(db_path: str | Path = DEFAULT_DB_PATH, echo: bool = False) -> En
 
 # Default engine + session factory used by the app.
 engine: Engine = make_engine()
-SessionLocal = sessionmaker(
-    bind=engine, autoflush=False, expire_on_commit=False, future=True
-)
+SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False, future=True)
 
 
 def init_db(eng: Engine | None = None) -> Engine:

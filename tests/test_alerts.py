@@ -1,6 +1,6 @@
 """Limits & alerts tests (Task 3.4)."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 
 import pytest
 from sqlalchemy.orm import sessionmaker
@@ -18,7 +18,7 @@ from iar.risk.alerts import (
     load_limits,
 )
 
-VINTAGE = datetime(2026, 6, 8, 9, 0, tzinfo=timezone.utc)
+VINTAGE = datetime(2026, 6, 8, 9, 0, tzinfo=UTC)
 
 
 @pytest.fixture
@@ -33,14 +33,26 @@ def _run_with_iar(session, gross_iar, spread_iar, *, name="NO2 Wind", run_ts=VIN
     """Create a portfolio + a SimulationRun with gross/spread IaRResults."""
     pf = get_or_create_portfolio(session, f"user::{name}", name, "NO2")
     run = SimulationRun(
-        portfolio_id=pf.portfolio_id, run_ts=run_ts, vintage_ts=run_ts,
-        n_scenarios=5000, seed=42, config_json="{}",
+        portfolio_id=pf.portfolio_id,
+        run_ts=run_ts,
+        vintage_ts=run_ts,
+        n_scenarios=5000,
+        seed=42,
+        config_json="{}",
     )
     session.add(run)
     session.flush()
     for iar_type, val in (("gross", gross_iar), ("spread", spread_iar)):
-        session.add(IaRResult(run_id=run.run_id, confidence=0.95, horizon="2026-06-08",
-                              iar_type=iar_type, iar_value=val, ciar_value=val))
+        session.add(
+            IaRResult(
+                run_id=run.run_id,
+                confidence=0.95,
+                horizon="2026-06-08",
+                iar_type=iar_type,
+                iar_value=val,
+                ciar_value=val,
+            )
+        )
     session.flush()
     return pf, run
 
@@ -55,10 +67,12 @@ def test_load_limits_reads_defaults():
 
 
 def test_limit_for_override_beats_default():
-    cfg = LimitConfig({
-        "default": {"gross": {"remaining_day_eur": 50000}},
-        "portfolio": {"NO2 Wind": {"gross": {"remaining_day_eur": 75000}}},
-    })
+    cfg = LimitConfig(
+        {
+            "default": {"gross": {"remaining_day_eur": 50000}},
+            "portfolio": {"NO2 Wind": {"gross": {"remaining_day_eur": 75000}}},
+        }
+    )
     assert cfg.limit_for("NO2 Wind", "gross", "remaining_day") == 75000
     assert cfg.limit_for("Other", "gross", "remaining_day") == 50000
 
@@ -78,9 +92,9 @@ def test_limit_for_bad_type_raises():
 # Severity
 # --------------------------------------------------------------------------- #
 def test_classify_hard_soft_within():
-    assert classify_severity(60000, 50000) == "hard"     # > L
-    assert classify_severity(45000, 50000) == "soft"     # > 0.8L, <= L
-    assert classify_severity(30000, 50000) is None        # <= 0.8L
+    assert classify_severity(60000, 50000) == "hard"  # > L
+    assert classify_severity(45000, 50000) == "soft"  # > 0.8L, <= L
+    assert classify_severity(30000, 50000) is None  # <= 0.8L
 
 
 def test_classify_negative_iar_never_breaches():
@@ -96,10 +110,14 @@ def test_classify_nonpositive_limit_is_none():
 # check_run (pure)
 # --------------------------------------------------------------------------- #
 def test_check_run_reports_headroom_and_severity(session):
-    cfg = LimitConfig({"default": {
-        "gross": {"remaining_day_eur": 50000},
-        "spread": {"remaining_day_eur": 40000},
-    }})
+    cfg = LimitConfig(
+        {
+            "default": {
+                "gross": {"remaining_day_eur": 50000},
+                "spread": {"remaining_day_eur": 40000},
+            }
+        }
+    )
     _pf, run = _run_with_iar(session, gross_iar=60000, spread_iar=10000)
     checks = {c.iar_type: c for c in check_run(run, cfg)}
     assert checks["gross"].severity == "hard"
@@ -119,10 +137,14 @@ def test_check_run_skips_variants_without_limits(session):
 # evaluate_run / evaluate_latest (persisting)
 # --------------------------------------------------------------------------- #
 def test_evaluate_run_persists_only_breaches(session):
-    cfg = LimitConfig({"default": {
-        "gross": {"remaining_day_eur": 50000},
-        "spread": {"remaining_day_eur": 40000},
-    }})
+    cfg = LimitConfig(
+        {
+            "default": {
+                "gross": {"remaining_day_eur": 50000},
+                "spread": {"remaining_day_eur": 40000},
+            }
+        }
+    )
     _pf, run = _run_with_iar(session, gross_iar=60000, spread_iar=10000)
     alerts = evaluate_run(session, run, cfg, breach_ts=VINTAGE)
     session.commit()
@@ -160,17 +182,30 @@ def test_evaluate_run_persist_false_writes_nothing(session):
 
 def test_evaluate_latest_picks_newest_run(session):
     cfg = LimitConfig({"default": {"gross": {"remaining_day_eur": 50000}}})
-    pf, _old = _run_with_iar(session, gross_iar=10, spread_iar=0,
-                             run_ts=datetime(2026, 6, 7, tzinfo=timezone.utc))
+    pf, _old = _run_with_iar(
+        session, gross_iar=10, spread_iar=0, run_ts=datetime(2026, 6, 7, tzinfo=UTC)
+    )
     # newer run for the SAME portfolio that breaches
-    run2 = SimulationRun(portfolio_id=pf.portfolio_id,
-                         run_ts=datetime(2026, 6, 9, tzinfo=timezone.utc),
-                         vintage_ts=datetime(2026, 6, 9, tzinfo=timezone.utc),
-                         n_scenarios=5000, seed=42, config_json="{}")
+    run2 = SimulationRun(
+        portfolio_id=pf.portfolio_id,
+        run_ts=datetime(2026, 6, 9, tzinfo=UTC),
+        vintage_ts=datetime(2026, 6, 9, tzinfo=UTC),
+        n_scenarios=5000,
+        seed=42,
+        config_json="{}",
+    )
     session.add(run2)
     session.flush()
-    session.add(IaRResult(run_id=run2.run_id, confidence=0.95, horizon="2026-06-09",
-                          iar_type="gross", iar_value=99000, ciar_value=99000))
+    session.add(
+        IaRResult(
+            run_id=run2.run_id,
+            confidence=0.95,
+            horizon="2026-06-09",
+            iar_type="gross",
+            iar_value=99000,
+            ciar_value=99000,
+        )
+    )
     session.flush()
     alerts = evaluate_latest(session, pf.portfolio_id, cfg)
     assert len(alerts) == 1 and alerts[0].severity == "hard"

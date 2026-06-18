@@ -48,7 +48,7 @@ class User(Base):
     user_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(120), nullable=False, unique=True)
 
-    portfolio: Mapped["Portfolio"] = relationship(
+    portfolio: Mapped[Portfolio] = relationship(
         back_populates="user", uselist=False, cascade="all, delete-orphan"
     )
 
@@ -61,30 +61,28 @@ class Portfolio(Base):
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     price_area: Mapped[str] = mapped_column(String(8), nullable=False)
 
-    user: Mapped["User"] = relationship(back_populates="portfolio")
-    dam_positions: Mapped[list["DAMPosition"]] = relationship(
+    user: Mapped[User] = relationship(back_populates="portfolio")
+    dam_positions: Mapped[list[DAMPosition]] = relationship(
         back_populates="portfolio", cascade="all, delete-orphan"
     )
-    generation_forecasts: Mapped[list["GenerationForecast"]] = relationship(
+    generation_forecasts: Mapped[list[GenerationForecast]] = relationship(
         back_populates="portfolio", cascade="all, delete-orphan"
     )
-    actual_deliveries: Mapped[list["ActualDelivery"]] = relationship(
+    actual_deliveries: Mapped[list[ActualDelivery]] = relationship(
         back_populates="portfolio", cascade="all, delete-orphan"
     )
-    simulation_runs: Mapped[list["SimulationRun"]] = relationship(
+    simulation_runs: Mapped[list[SimulationRun]] = relationship(
         back_populates="portfolio", cascade="all, delete-orphan"
     )
-    alerts: Mapped[list["Alert"]] = relationship(
+    alerts: Mapped[list[Alert]] = relationship(
         back_populates="portfolio", cascade="all, delete-orphan"
     )
-    performance_records: Mapped[list["HistoricalPerformanceRecord"]] = relationship(
+    performance_records: Mapped[list[HistoricalPerformanceRecord]] = relationship(
         back_populates="portfolio", cascade="all, delete-orphan"
     )
 
     __table_args__ = (
-        CheckConstraint(
-            "price_area IN ('NO1', 'NO2', 'SE3')", name="ck_portfolio_price_area"
-        ),
+        CheckConstraint("price_area IN ('NO1', 'NO2', 'SE3')", name="ck_portfolio_price_area"),
     )
 
 
@@ -97,13 +95,11 @@ class DAMPosition(Base):
     __tablename__ = "dam_positions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    portfolio_id: Mapped[int] = mapped_column(
-        ForeignKey("portfolios.portfolio_id"), nullable=False
-    )
+    portfolio_id: Mapped[int] = mapped_column(ForeignKey("portfolios.portfolio_id"), nullable=False)
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     mwh: Mapped[float] = mapped_column(Float, nullable=False)
 
-    portfolio: Mapped["Portfolio"] = relationship(back_populates="dam_positions")
+    portfolio: Mapped[Portfolio] = relationship(back_populates="dam_positions")
 
     __table_args__ = (
         UniqueConstraint("portfolio_id", "timestamp", name="uq_dam_pos_pf_ts"),
@@ -117,13 +113,11 @@ class GenerationForecast(Base):
     __tablename__ = "generation_forecasts"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    portfolio_id: Mapped[int] = mapped_column(
-        ForeignKey("portfolios.portfolio_id"), nullable=False
-    )
+    portfolio_id: Mapped[int] = mapped_column(ForeignKey("portfolios.portfolio_id"), nullable=False)
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     forecast_mwh: Mapped[float] = mapped_column(Float, nullable=False)
 
-    portfolio: Mapped["Portfolio"] = relationship(back_populates="generation_forecasts")
+    portfolio: Mapped[Portfolio] = relationship(back_populates="generation_forecasts")
 
     __table_args__ = (
         UniqueConstraint("portfolio_id", "timestamp", name="uq_gen_fc_pf_ts"),
@@ -137,13 +131,11 @@ class ActualDelivery(Base):
     __tablename__ = "actual_deliveries"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    portfolio_id: Mapped[int] = mapped_column(
-        ForeignKey("portfolios.portfolio_id"), nullable=False
-    )
+    portfolio_id: Mapped[int] = mapped_column(ForeignKey("portfolios.portfolio_id"), nullable=False)
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     actual_mwh: Mapped[float] = mapped_column(Float, nullable=False)
 
-    portfolio: Mapped["Portfolio"] = relationship(back_populates="actual_deliveries")
+    portfolio: Mapped[Portfolio] = relationship(back_populates="actual_deliveries")
 
     __table_args__ = (
         UniqueConstraint("portfolio_id", "timestamp", name="uq_actual_del_pf_ts"),
@@ -237,9 +229,7 @@ class SimulationRun(Base):
     __tablename__ = "simulation_runs"
 
     run_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    portfolio_id: Mapped[int] = mapped_column(
-        ForeignKey("portfolios.portfolio_id"), nullable=False
-    )
+    portfolio_id: Mapped[int] = mapped_column(ForeignKey("portfolios.portfolio_id"), nullable=False)
     run_ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     vintage_ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     n_scenarios: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -251,8 +241,8 @@ class SimulationRun(Base):
     # (architecture still stores summaries, not raw scenarios — these are read-offs).
     per_mtu_json: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    portfolio: Mapped["Portfolio"] = relationship(back_populates="simulation_runs")
-    results: Mapped[list["IaRResult"]] = relationship(
+    portfolio: Mapped[Portfolio] = relationship(back_populates="simulation_runs")
+    results: Mapped[list[IaRResult]] = relationship(
         back_populates="run", cascade="all, delete-orphan"
     )
 
@@ -275,8 +265,8 @@ class IaRResult(Base):
     iar_value: Mapped[float] = mapped_column(Float, nullable=False)
     ciar_value: Mapped[float | None] = mapped_column(Float, nullable=True)
 
-    run: Mapped["SimulationRun"] = relationship(back_populates="results")
-    alerts: Mapped[list["Alert"]] = relationship(back_populates="result")
+    run: Mapped[SimulationRun] = relationship(back_populates="results")
+    alerts: Mapped[list[Alert]] = relationship(back_populates="result")
 
     __table_args__ = (
         CheckConstraint("iar_type IN ('gross', 'spread')", name="ck_iar_type"),
@@ -293,21 +283,17 @@ class Alert(Base):
     __tablename__ = "alerts"
 
     alert_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    portfolio_id: Mapped[int] = mapped_column(
-        ForeignKey("portfolios.portfolio_id"), nullable=False
-    )
+    portfolio_id: Mapped[int] = mapped_column(ForeignKey("portfolios.portfolio_id"), nullable=False)
     result_id: Mapped[int] = mapped_column(ForeignKey("iar_results.result_id"), nullable=False)
     limit_type: Mapped[str] = mapped_column(String(32), nullable=False)
     limit_value: Mapped[float] = mapped_column(Float, nullable=False)
     breach_ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     severity: Mapped[str] = mapped_column(String(16), nullable=False)
 
-    portfolio: Mapped["Portfolio"] = relationship(back_populates="alerts")
-    result: Mapped["IaRResult"] = relationship(back_populates="alerts")
+    portfolio: Mapped[Portfolio] = relationship(back_populates="alerts")
+    result: Mapped[IaRResult] = relationship(back_populates="alerts")
 
-    __table_args__ = (
-        Index("ix_alert_pf", "portfolio_id"),
-    )
+    __table_args__ = (Index("ix_alert_pf", "portfolio_id"),)
 
 
 class HistoricalPerformanceRecord(Base):
@@ -316,17 +302,13 @@ class HistoricalPerformanceRecord(Base):
     __tablename__ = "historical_performance_records"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    portfolio_id: Mapped[int] = mapped_column(
-        ForeignKey("portfolios.portfolio_id"), nullable=False
-    )
+    portfolio_id: Mapped[int] = mapped_column(ForeignKey("portfolios.portfolio_id"), nullable=False)
     period: Mapped[str] = mapped_column(String(32), nullable=False)
     iar_estimate: Mapped[float] = mapped_column(Float, nullable=False)
     realised_cost: Mapped[float] = mapped_column(Float, nullable=False)
     exceeded: Mapped[bool] = mapped_column(nullable=False)
     kupiec_stat: Mapped[float | None] = mapped_column(Float, nullable=True)
 
-    portfolio: Mapped["Portfolio"] = relationship(back_populates="performance_records")
+    portfolio: Mapped[Portfolio] = relationship(back_populates="performance_records")
 
-    __table_args__ = (
-        Index("ix_perf_pf_period", "portfolio_id", "period"),
-    )
+    __table_args__ = (Index("ix_perf_pf_period", "portfolio_id", "period"),)

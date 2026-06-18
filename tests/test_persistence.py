@@ -1,7 +1,7 @@
 """Tests for simulation-result persistence (Task 2.4)."""
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 
 import numpy as np
 import pytest
@@ -13,10 +13,10 @@ from iar.db.session import init_db, make_engine
 from iar.ingestion.flatfile_loader import get_or_create_portfolio
 from iar.simulation.engine import EngineConfig, run_simulation
 from iar.simulation.imbalance_model import ImbalanceModel
-from iar.simulation.price_sampler import QuantilePriceSampler
 from iar.simulation.persistence import persist_report
+from iar.simulation.price_sampler import QuantilePriceSampler
 
-VINTAGE = datetime(2026, 6, 8, 9, 0, tzinfo=timezone.utc)
+VINTAGE = datetime(2026, 6, 8, 9, 0, tzinfo=UTC)
 
 
 @pytest.fixture
@@ -29,12 +29,12 @@ def session():
 
 @pytest.fixture
 def report():
-    price = QuantilePriceSampler(
-        np.array([0.05, 0.5, 0.95]), np.tile([-20.0, 0.0, 30.0], (4, 1))
-    )
+    price = QuantilePriceSampler(np.array([0.05, 0.5, 0.95]), np.tile([-20.0, 0.0, 30.0], (4, 1)))
     imb = ImbalanceModel(np.full(4, 1.0), np.full(4, 3.0), dist="normal")
     return run_simulation(
-        price, imb, dam_price=np.full(4, 40.0),
+        price,
+        imb,
+        dam_price=np.full(4, 40.0),
         config=EngineConfig(n_scenarios=5000, confidence=0.95, seed=42),
     )
 
@@ -48,7 +48,7 @@ def test_persist_creates_run_and_two_results(session, report):
     assert run.run_id is not None
     assert run.n_scenarios == 5000
     assert run.seed == 42
-    assert run.vintage_ts.replace(tzinfo=timezone.utc) == VINTAGE
+    assert run.vintage_ts.replace(tzinfo=UTC) == VINTAGE
 
     results = session.query(IaRResult).filter_by(run_id=run.run_id).all()
     assert {r.iar_type for r in results} == {"gross", "spread"}
@@ -71,7 +71,11 @@ def test_persisted_values_match_report(session, report):
 def test_config_json_records_reproducibility_info(session, report):
     pf = get_or_create_portfolio(session, "Carol", "NO2 Wind", "NO2")
     run = persist_report(
-        session, report, pf.portfolio_id, VINTAGE, horizon="h",
+        session,
+        report,
+        pf.portfolio_id,
+        VINTAGE,
+        horizon="h",
         extra_config={"area": "NO2", "dist": "normal"},
     )
     cfg = json.loads(run.config_json)

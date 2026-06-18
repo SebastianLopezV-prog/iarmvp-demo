@@ -71,10 +71,7 @@ def _ts_map(rows, value_attr: str) -> dict[pd.Timestamp, float]:
     SQLite hands back naive datetimes; normalise to tz-aware UTC so series from
     different tables (and from the live API) align on identical keys.
     """
-    return {
-        pd.to_datetime(r.timestamp, utc=True): float(getattr(r, value_attr))
-        for r in rows
-    }
+    return {pd.to_datetime(r.timestamp, utc=True): float(getattr(r, value_attr)) for r in rows}
 
 
 def compute_realised_cost(
@@ -107,15 +104,11 @@ def compute_realised_cost(
         raise ValueError(f"Portfolio id {portfolio_id} does not exist.")
     area = portfolio.price_area
 
-    dam_pos = _ts_map(
-        session.query(DAMPosition).filter_by(portfolio_id=portfolio_id), "mwh"
-    )
+    dam_pos = _ts_map(session.query(DAMPosition).filter_by(portfolio_id=portfolio_id), "mwh")
     actual = _ts_map(
         session.query(ActualDelivery).filter_by(portfolio_id=portfolio_id), "actual_mwh"
     )
-    imb_price = _ts_map(
-        session.query(ActualImbalancePrice).filter_by(price_area=area), "price"
-    )
+    imb_price = _ts_map(session.query(ActualImbalancePrice).filter_by(price_area=area), "price")
     dam_price = _ts_map(session.query(DAMPrice).filter_by(price_area=area), "price")
 
     # Intersection: an MTU is settled only if every input is present.
@@ -123,19 +116,16 @@ def compute_realised_cost(
 
     lo = pd.to_datetime(start, utc=True) if start is not None else None
     hi = pd.to_datetime(end, utc=True) if end is not None else None
-    timestamps = {
-        t for t in timestamps
-        if (lo is None or t >= lo) and (hi is None or t < hi)
-    }
+    timestamps = {t for t in timestamps if (lo is None or t >= lo) and (hi is None or t < hi)}
 
     rows = []
     for t in sorted(timestamps):
         pos = dam_pos[t]
         act = actual[t]
-        lam = imb_price[t]   # absolute imbalance price
+        lam = imb_price[t]  # absolute imbalance price
         spot = dam_price[t]
-        imbalance = pos - act           # MWh; >0 = short
-        spread = lam - spot             # imbalance price spread vs day-ahead
+        imbalance = pos - act  # MWh; >0 = short
+        spread = lam - spot  # imbalance price spread vs day-ahead
         rows.append(
             {
                 "timestamp": t,
@@ -177,7 +167,7 @@ def realised_period_cost(
     return {
         "gross": float(df["gross_cost"].sum()),
         "spread": float(df["spread_cost"].sum()),
-        "n_mtus": int(len(df)),
+        "n_mtus": len(df),
         "first_mtu": df["timestamp"].iloc[0].to_pydatetime(),
         "last_mtu": df["timestamp"].iloc[-1].to_pydatetime(),
     }

@@ -1,6 +1,6 @@
 """Schema tests for Task 1.2: tables build, relationships and constraints hold."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 
 import pytest
 from sqlalchemy import inspect
@@ -50,8 +50,8 @@ def test_user_portfolio_run_result_chain(session):
     pf = Portfolio(name="NO2 Wind", price_area="NO2", user=user)
     run = SimulationRun(
         portfolio=pf,
-        run_ts=datetime.now(timezone.utc),
-        vintage_ts=datetime.now(timezone.utc),
+        run_ts=datetime.now(UTC),
+        vintage_ts=datetime.now(UTC),
         n_scenarios=5000,
         seed=42,
     )
@@ -72,14 +72,12 @@ def test_iar_type_check_constraint(session):
     pf = Portfolio(name="P", price_area="NO1", user=User(name="Bob"))
     run = SimulationRun(
         portfolio=pf,
-        run_ts=datetime.now(timezone.utc),
-        vintage_ts=datetime.now(timezone.utc),
+        run_ts=datetime.now(UTC),
+        vintage_ts=datetime.now(UTC),
         n_scenarios=10,
         seed=1,
     )
-    run.results.append(
-        IaRResult(confidence=0.95, horizon="24h", iar_type="bogus", iar_value=1.0)
-    )
+    run.results.append(IaRResult(confidence=0.95, horizon="24h", iar_type="bogus", iar_value=1.0))
     session.add(pf)
     with pytest.raises(IntegrityError):
         session.commit()

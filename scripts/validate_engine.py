@@ -71,14 +71,20 @@ def v1_analytic() -> None:
     sigma = np.full(6, 2.0)
     spread = np.full(6, 5.0)
     dam = np.full(6, 40.0)
-    rep = run_simulation(const_price(spread), normal_imb(mu, sigma), dam_price=dam,
-                         config=EngineConfig(n_scenarios=400_000, confidence=CONF, seed=1))
+    rep = run_simulation(
+        const_price(spread),
+        normal_imb(mu, sigma),
+        dam_price=dam,
+        config=EngineConfig(n_scenarios=400_000, confidence=CONF, seed=1),
+    )
 
     for name, k, m in (("GROSS", dam + spread, rep.gross), ("SPREAD", spread, rep.spread)):
         a_iar, a_ciar = analytic(k, mu, sigma)
         ok = abs(m.iar - a_iar) / abs(a_iar) < 0.02 and abs(m.ciar - a_ciar) / abs(a_ciar) < 0.02
-        print(f"    {name}: IaR engine={m.iar:10,.1f} analytic={a_iar:10,.1f} | "
-              f"CIaR engine={m.ciar:10,.1f} analytic={a_ciar:10,.1f}")
+        print(
+            f"    {name}: IaR engine={m.iar:10,.1f} analytic={a_iar:10,.1f} | "
+            f"CIaR engine={m.ciar:10,.1f} analytic={a_ciar:10,.1f}"
+        )
         check(f"{name} IaR & CIaR within 2% of closed form", ok)
 
 
@@ -91,9 +97,18 @@ def v2_convergence() -> None:
     target, _ = analytic(dam + spread, mu, sigma)
 
     def avg_err(n: int) -> float:
-        errs = [abs(run_simulation(const_price(spread), normal_imb(mu, sigma), dam_price=dam,
-                config=EngineConfig(n_scenarios=n, confidence=CONF, seed=s)).gross.iar - target)
-                for s in range(8)]
+        errs = [
+            abs(
+                run_simulation(
+                    const_price(spread),
+                    normal_imb(mu, sigma),
+                    dam_price=dam,
+                    config=EngineConfig(n_scenarios=n, confidence=CONF, seed=s),
+                ).gross.iar
+                - target
+            )
+            for s in range(8)
+        ]
         return float(np.mean(errs))
 
     ns = [500, 2_000, 8_000, 32_000, 128_000]
@@ -105,8 +120,11 @@ def v2_convergence() -> None:
     # error should fall monotonically (allow a tiny wobble) and shrink a lot overall
     monotone = all(errs[i + 1] <= errs[i] * 1.15 for i in range(len(errs) - 1))
     check("error decreases as N grows", monotone)
-    check("error at N=128k is < 10% of error at N=500", errs[-1] < 0.1 * errs[0],
-          f"{errs[-1]:.2f} vs {errs[0]:.2f}")
+    check(
+        "error at N=128k is < 10% of error at N=500",
+        errs[-1] < 0.1 * errs[0],
+        f"{errs[-1]:.2f} vs {errs[0]:.2f}",
+    )
 
 
 def v3_reproducibility() -> None:
@@ -115,18 +133,29 @@ def v3_reproducibility() -> None:
     price = QuantilePriceSampler(np.array([0.1, 0.5, 0.9]), np.tile([-5.0, 0.0, 8.0], (3, 1)))
     dam = np.full(3, 30.0)
 
-    a = run_simulation(price, normal_imb(mu, sigma), dam_price=dam,
-                       config=EngineConfig(n_scenarios=20_000, seed=99))
-    b = run_simulation(price, normal_imb(mu, sigma), dam_price=dam,
-                       config=EngineConfig(n_scenarios=20_000, seed=99))
-    c = run_simulation(price, normal_imb(mu, sigma), dam_price=dam,
-                       config=EngineConfig(n_scenarios=20_000, seed=7))
+    a = run_simulation(
+        price,
+        normal_imb(mu, sigma),
+        dam_price=dam,
+        config=EngineConfig(n_scenarios=20_000, seed=99),
+    )
+    b = run_simulation(
+        price,
+        normal_imb(mu, sigma),
+        dam_price=dam,
+        config=EngineConfig(n_scenarios=20_000, seed=99),
+    )
+    c = run_simulation(
+        price, normal_imb(mu, sigma), dam_price=dam, config=EngineConfig(n_scenarios=20_000, seed=7)
+    )
     print(f"    seed 99 (run A) gross IaR = {a.gross.iar:,.2f}")
     print(f"    seed 99 (run B) gross IaR = {b.gross.iar:,.2f}")
     print(f"    seed  7 (run C) gross IaR = {c.gross.iar:,.2f}")
     check("same seed -> identical IaR", a.gross.iar == b.gross.iar)
-    check("different seed -> different IaR (but same ballpark)",
-          a.gross.iar != c.gross.iar and abs(a.gross.iar - c.gross.iar) < 0.2 * abs(a.gross.iar))
+    check(
+        "different seed -> different IaR (but same ballpark)",
+        a.gross.iar != c.gross.iar and abs(a.gross.iar - c.gross.iar) < 0.2 * abs(a.gross.iar),
+    )
 
 
 def v4_summed_quantile() -> None:
@@ -136,16 +165,24 @@ def v4_summed_quantile() -> None:
     spread = np.full(6, 4.0)
     dam = np.full(6, 30.0)
     k = dam + spread
-    rep = run_simulation(const_price(spread), normal_imb(mu, sigma), dam_price=dam,
-                         config=EngineConfig(n_scenarios=400_000, confidence=CONF, seed=2))
+    rep = run_simulation(
+        const_price(spread),
+        normal_imb(mu, sigma),
+        dam_price=dam,
+        config=EngineConfig(n_scenarios=400_000, confidence=CONF, seed=2),
+    )
 
-    correct = float(np.sum(k * mu)) + Z * float(np.sqrt(np.sum((k * sigma) ** 2)))  # quantile of sum
-    naive = float(np.sum(k * mu)) + Z * float(np.sum(np.abs(k) * sigma))            # sum of quantiles
+    correct = float(np.sum(k * mu)) + Z * float(
+        np.sqrt(np.sum((k * sigma) ** 2))
+    )  # quantile of sum
+    naive = float(np.sum(k * mu)) + Z * float(np.sum(np.abs(k) * sigma))  # sum of quantiles
     print(f"    engine (quantile of summed cost) = {rep.gross.iar:10,.1f} EUR")
     print(f"    correct closed form               = {correct:10,.1f} EUR")
     print(f"    WRONG sum-of-per-MTU IaRs          = {naive:10,.1f} EUR")
     print(f"    diversification benefit captured   = {naive - rep.gross.iar:10,.1f} EUR")
-    check("engine matches quantile-of-sum (within 2%)", abs(rep.gross.iar - correct) / correct < 0.02)
+    check(
+        "engine matches quantile-of-sum (within 2%)", abs(rep.gross.iar - correct) / correct < 0.02
+    )
     check("engine < naive sum-of-per-MTU (no overstatement)", rep.gross.iar < naive)
 
 

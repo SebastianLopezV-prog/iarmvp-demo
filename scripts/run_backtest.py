@@ -27,19 +27,34 @@ from iar.risk.backtest import BacktestResult, run_backtest
 def parse_args() -> argparse.Namespace:
     ap = argparse.ArgumentParser(description="Run the IaR backtest (3.3) and print calibration.")
     ap.add_argument("--area", default="NO2", help="price area (NO1/NO2/SE3)")
-    ap.add_argument("--basis", choices=["gross", "spread", "both"], default="gross",
-                    help="IaR basis to test (default gross)")
-    ap.add_argument("--significance", type=float, default=0.05,
-                    help="Kupiec test significance level (default 0.05)")
-    ap.add_argument("--no-persist", action="store_true",
-                    help="compute only; do not write HistoricalPerformanceRecord rows")
+    ap.add_argument(
+        "--basis",
+        choices=["gross", "spread", "both"],
+        default="gross",
+        help="IaR basis to test (default gross)",
+    )
+    ap.add_argument(
+        "--significance",
+        type=float,
+        default=0.05,
+        help="Kupiec test significance level (default 0.05)",
+    )
+    ap.add_argument(
+        "--no-persist",
+        action="store_true",
+        help="compute only; do not write HistoricalPerformanceRecord rows",
+    )
     return ap.parse_args()
 
 
 def _portfolio(area: str):
     with get_session() as s:
-        pf = (s.query(Portfolio).filter_by(price_area=area)
-              .order_by(Portfolio.portfolio_id.desc()).first())
+        pf = (
+            s.query(Portfolio)
+            .filter_by(price_area=area)
+            .order_by(Portfolio.portfolio_id.desc())
+            .first()
+        )
         return (pf.portfolio_id, pf.name) if pf else (None, None)
 
 
@@ -55,22 +70,30 @@ def _print_result(res: BacktestResult, persist_note: str) -> None:
     print(bar)
     print(f"basis: {res.iar_type.upper()}  (confidence {conf})")
     if res.n_periods == 0:
-        print("  no settled periods to compare yet — "
-              "load realised prices (load_actuals.py) and backfill estimates (backfill_iar.py).")
+        print(
+            "  no settled periods to compare yet — "
+            "load realised prices (load_actuals.py) and backfill estimates (backfill_iar.py)."
+        )
         return
 
     df = res.as_frame().copy()
     df["exceeded"] = df["exceeded"].map(lambda v: "EXCEEDED" if v else "within")
-    print(df.to_string(index=False,
-                       formatters={"iar_estimate": "{:,.0f}".format,
-                                   "realised_cost": "{:,.0f}".format}))
+    print(
+        df.to_string(
+            index=False,
+            formatters={"iar_estimate": "{:,.0f}".format, "realised_cost": "{:,.0f}".format},
+        )
+    )
     print(bar)
     lr = f"{k.lr_statistic:.3f}" if k.lr_statistic is not None else "n/a"
     pv = f"{k.p_value:.3f}" if k.p_value is not None else "n/a"
-    print(f"exceedances    : {res.n_exceedances} / {res.n_periods}  "
-          f"(observed {k.observed_rate:.0%}, expected ~{k.expected_rate:.0%})")
-    print(f"Kupiec POF     : LR={lr}  p-value={pv}  ->  {_verdict(res)} "
-          f"(alpha={k.significance:.0%})")
+    print(
+        f"exceedances    : {res.n_exceedances} / {res.n_periods}  "
+        f"(observed {k.observed_rate:.0%}, expected ~{k.expected_rate:.0%})"
+    )
+    print(
+        f"Kupiec POF     : LR={lr}  p-value={pv}  ->  {_verdict(res)} (alpha={k.significance:.0%})"
+    )
     print(f"records        : {persist_note}")
 
 
@@ -108,11 +131,14 @@ def main() -> None:
         s.commit()
 
     print("=" * 64)
-    print(f"stored -> {DEFAULT_DB_PATH}  "
-          "(read back via iar.risk.backtest.load_performance_records)")
+    print(
+        f"stored -> {DEFAULT_DB_PATH}  (read back via iar.risk.backtest.load_performance_records)"
+    )
     if args.basis == "both" and persist:
-        print("note: with --basis both, only GROSS records were persisted "
-              "(HistoricalPerformanceRecord has no basis column).")
+        print(
+            "note: with --basis both, only GROSS records were persisted "
+            "(HistoricalPerformanceRecord has no basis column)."
+        )
 
 
 if __name__ == "__main__":

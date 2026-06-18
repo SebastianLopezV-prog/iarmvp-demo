@@ -53,8 +53,12 @@ def ensure_positions(area: str, days: int, force: bool) -> None:
 
     init_db()
     with get_session() as s:
-        pf = (s.query(Portfolio).filter_by(price_area=area)
-              .order_by(Portfolio.portfolio_id.desc()).first())
+        pf = (
+            s.query(Portfolio)
+            .filter_by(price_area=area)
+            .order_by(Portfolio.portfolio_id.desc())
+            .first()
+        )
         has_positions = pf is not None and (
             s.query(DAMPosition).filter_by(portfolio_id=pf.portfolio_id).first() is not None
         )
@@ -62,8 +66,12 @@ def ensure_positions(area: str, days: int, force: bool) -> None:
             print(f"  positions already present for {area} (keeping them).")
             return
         pf, n = store_synthetic_portfolio(
-            s, area, start=f"-P{days + 1}D", end="P3D",
-            user=f"Wind Co {area}", portfolio_name=f"{area} Wind",
+            s,
+            area,
+            start=f"-P{days + 1}D",
+            end="P3D",
+            user=f"Wind Co {area}",
+            portfolio_name=f"{area} Wind",
         )
         s.commit()
         print(f"  generated synthetic wind portfolio '{pf.name}' (#{pf.portfolio_id}): {n} MTUs")
@@ -85,8 +93,15 @@ def clear_generated_tables() -> None:
     init_db()
     with get_session() as s:
         # Children first, then parents, then the price/forecast feeds.
-        for model in (Alert, IaRResult, HistoricalPerformanceRecord, SimulationRun,
-                      ImbalancePriceForecast, DAMPrice, ActualImbalancePrice):
+        for model in (
+            Alert,
+            IaRResult,
+            HistoricalPerformanceRecord,
+            SimulationRun,
+            ImbalancePriceForecast,
+            DAMPrice,
+            ActualImbalancePrice,
+        ):
             n = s.query(model).delete()
             print(f"  cleared {model.__name__}: {n} rows")
         s.commit()
@@ -97,8 +112,11 @@ def parse_args() -> argparse.Namespace:
     ap.add_argument("--area", default="NO2", help="price area (NO2 for the MVP)")
     ap.add_argument("--days", type=int, default=30, help="days of day-ahead history to backfill")
     ap.add_argument("--scenarios", type=int, default=10_000, help="MC scenarios per run")
-    ap.add_argument("--fresh-positions", action="store_true",
-                    help="regenerate synthetic positions even if some already exist")
+    ap.add_argument(
+        "--fresh-positions",
+        action="store_true",
+        help="regenerate synthetic positions even if some already exist",
+    )
     return ap.parse_args()
 
 
@@ -106,8 +124,7 @@ def main() -> None:
     args = parse_args()
     bar = "=" * 64
     print(bar)
-    print(f"Seeding SYNTHETIC demo | area={args.area} days={args.days} "
-          f"scenarios={args.scenarios}")
+    print(f"Seeding SYNTHETIC demo | area={args.area} days={args.days} scenarios={args.scenarios}")
     print(bar)
 
     print("\n[1/6] Ensuring a wind portfolio with positions exists...")
@@ -117,8 +134,15 @@ def main() -> None:
     clear_generated_tables()
 
     print("\n[3/6] Backfilling day-ahead IaR history from the synthetic spread forecast...")
-    _run("backfill_history.py", "--area", args.area, "--days", str(args.days),
-         "--scenarios", str(args.scenarios))
+    _run(
+        "backfill_history.py",
+        "--area",
+        args.area,
+        "--days",
+        str(args.days),
+        "--scenarios",
+        str(args.scenarios),
+    )
 
     print("\n[3/5] Loading synthetic DAM + realised imbalance prices...")
     _run("load_actuals.py", "--area", args.area, f"--start=-P{args.days + 1}D", "--end=P0D")
@@ -129,8 +153,10 @@ def main() -> None:
     print("\n[5/5] Running the Kupiec backtest (Gross + Spread)...")
     _run("run_backtest.py", "--area", args.area, "--basis", "both")
 
-    print(f"\n{bar}\nDone. The demo database is now fully synthetic. "
-          f"Launch the dashboard with scripts/run_dashboard.bat.\n{bar}")
+    print(
+        f"\n{bar}\nDone. The demo database is now fully synthetic. "
+        f"Launch the dashboard with scripts/run_dashboard.bat.\n{bar}"
+    )
 
 
 if __name__ == "__main__":
