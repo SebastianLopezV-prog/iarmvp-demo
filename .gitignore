@@ -31,3 +31,7 @@ scratch/
 
 # Vendored internal SDK wheel (optipyclient) — pulled from Volue/sirius-prime releases
 vendor/
+# uv lockfile intentionally not committed for the demo: Streamlit Cloud runs an older
+# uv that cannot parse a newer-uv lock ("missing field version"); committing it also diverts
+# Cloud from the known-good pip install -r requirements.txt path. CI uses uv sync (no --frozen).
+uv.lock
