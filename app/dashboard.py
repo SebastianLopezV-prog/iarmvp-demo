@@ -34,7 +34,7 @@ from data_source import get_data_source
 # --------------------------------------------------------------------------- #
 # Theme
 # --------------------------------------------------------------------------- #
-VOLUE_ORANGE = "#FF5C39"
+VOLUE_ORANGE = "#FF5F00"  # official Volue Fluorescent Orange
 INK = "#141821"
 TEAL = "#1FA8A0"
 MUTED = "#6b7280"
