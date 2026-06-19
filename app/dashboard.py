@@ -43,9 +43,24 @@ WARN_AMBER = "#E08A00"
 BREACH_RED = "#D8453B"
 BLUE = "#2A7FD4"
 PURPLE = "#8A5CF6"
-FONT = "Inter, 'Segoe UI', system-ui, -apple-system, sans-serif"
+#: Volue corporate typeface is Arial (Bold for headings, Regular for body). Fall back to
+#: Arial-metric-compatible faces on hosts without Arial (e.g. Linux uses Liberation Sans).
+FONT = "Arial, 'Helvetica Neue', Helvetica, 'Liberation Sans', sans-serif"
 #: Accent palette cycled across the Usage feature cards.
 FEAT_PALETTE = [VOLUE_ORANGE, TEAL, BLUE, PURPLE, OK_GREEN, WARN_AMBER, BREACH_RED]
+
+#: Official Volue logotype as inline SVG (white knockout, for the dark header bar). This is
+#: the real brand mark, not a text wordmark; do not recolor, rotate, box or distort it.
+VOLUE_LOGO_SVG = (
+    '<svg class="volue-logo" viewBox="0 0 394.393 111.45" '
+    'xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Volue">'
+    '<path fill="#ffffff" d="M30.861 84.6396C33.494 92.8306 33.201 93.5616 33.201 97.8036L38.467 97.8036C38.467 93.5616 38.174 92.6836 40.807 84.6396L58.505 29.0605 71.668 29.0605 47.681 102.191 23.987 102.191 0 29.0605 13.163 29.0605 30.861 84.6396Z"/>'
+    '<path fill="#ffffff" d="M249.597 29.0605 249.597 70.3066C249.597 87.1266 258.665 94.1466 271.536 94.1466 286.602 94.1466 293.475 85.2246 293.475 68.4046L293.475 29.0605 305.176 29.0605 305.176 102.191 293.475 102.191 293.475 91.3676 288.21 91.3676C284.408 101.753 274.9 104.239 267.441 104.239 247.549 104.239 237.896 91.3676 237.896 70.3066L237.896 29.0605 249.598 29.0605Z"/>'
+    '<path fill="#ffffff" d="M359.145 36.9587C346.566 36.9587 338.083 45.1497 336.328 58.6047L382.254 58.6047C380.499 45.1497 372.016 36.9587 359.145 36.9587M359.145 27.0127C382.839 27.0127 394.394 43.5407 394.394 64.4557L394.394 67.6738 335.889 67.6738C336.328 83.9088 345.104 94.4388 359.145 94.4388 369.968 94.4388 376.989 88.4428 380.645 78.4968L392.931 78.4968C388.836 93.5618 378.159 104.239 359.145 104.239 335.889 104.239 324.188 87.7108 324.188 66.6498L324.188 64.4557C324.188 43.5407 335.889 27.0127 359.145 27.0127"/>'
+    '<path fill="#ffffff" d="M208.069 0.0003967 196.368 0.0003967 196.368 91.8066C196.368 97.5106 201.049 102.191 206.753 102.191L219.879 102.191 219.879 90.7826 208.069 90.7826 208.069 0.0003967Z"/>'
+    '<path fill="#ffffff" d="M116.266 100.679 141.867 100.679 161.478 84.2221 165.924 59.012 153.123 36.84 129.066 28.085 105.01 36.84 92.2089 59.012 96.6539 84.2221 116.266 100.679ZM145.787 111.45 112.346 111.45 86.7279 89.9551 80.9209 57.02 97.6409 28.06 129.066 16.6229 160.491 28.06 177.212 57.02 171.405 89.9551 145.787 111.45Z"/>'
+    "</svg>"
+)
 
 #: (label, colour) per severity. ``None`` => within limit.
 SEVERITY = {
@@ -77,9 +92,11 @@ _CSS = f"""
       border-bottom: 3px solid {VOLUE_ORANGE};
       display: flex; justify-content: space-between; align-items: center;
   }}
-  .volue-bar .brand {{ font-weight: 800; letter-spacing: 4px; font-size: 1.05rem; }}
-  .volue-bar .brand span {{ color: {VOLUE_ORANGE}; }}
-  .volue-bar .title {{ font-weight: 600; letter-spacing: 0; opacity: .9; margin-left: 12px; }}
+  .volue-bar .brandwrap {{ display: flex; align-items: center; }}
+  .volue-bar .brand {{ display: inline-flex; align-items: center; }}
+  .volue-bar .brand svg.volue-logo {{ height: 26px; width: auto; display: block; }}
+  .volue-bar .title {{ font-weight: 600; letter-spacing: 0; opacity: .9; margin-left: 14px;
+                       padding-left: 14px; border-left: 1px solid rgba(255,255,255,.25); }}
   .volue-bar .meta {{ font-size: 0.82rem; opacity: 0.82; text-align: right; }}
   .volue-bar .tag {{ background: {VOLUE_ORANGE}; color: #fff; border-radius: 6px;
                      padding: 1px 7px; font-weight: 700; font-size: .72rem; letter-spacing: 1px; }}
@@ -286,7 +303,7 @@ def render_header(pf: dict, ov: dict | None, kind: str) -> None:
     st.markdown(
         f"""
         <div class="volue-bar">
-          <div><span class="brand">VOL<span>U</span>E</span>
+          <div class="brandwrap"><span class="brand">{VOLUE_LOGO_SVG}</span>
                <span class="title">Imbalance at Risk</span></div>
           <div class="meta">{pf["name"]} &nbsp;&middot;&nbsp; Area {pf["price_area"]}
                &nbsp;&middot;&nbsp; <span class="tag">{tag}</span>
