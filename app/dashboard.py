@@ -43,9 +43,7 @@ WARN_AMBER = "#E08A00"
 BREACH_RED = "#D8453B"
 BLUE = "#2A7FD4"
 PURPLE = "#8A5CF6"
-#: Volue corporate typeface is Arial (Bold for headings, Regular for body). Fall back to
-#: Arial-metric-compatible faces on hosts without Arial (e.g. Linux uses Liberation Sans).
-FONT = "Arial, 'Helvetica Neue', Helvetica, 'Liberation Sans', sans-serif"
+FONT = "Manrope, 'Segoe UI', system-ui, -apple-system, sans-serif"
 #: Accent palette cycled across the Usage feature cards.
 FEAT_PALETTE = [VOLUE_ORANGE, TEAL, BLUE, PURPLE, OK_GREEN, WARN_AMBER, BREACH_RED]
 
@@ -71,7 +69,11 @@ SEVERITY = {
 
 _CSS = f"""
 <style>
+  @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
   html, body, [class*="css"] {{ font-family: {FONT}; }}
+  /* Apply the UI font to Streamlit's own text elements too (not the Volue logo SVG). */
+  [data-testid="stAppViewContainer"], [data-testid="stMarkdownContainer"],
+  .stTabs, button, input, textarea, select {{ font-family: {FONT}; }}
   [data-testid="stAppViewContainer"] {{ background: #f5f6f8; }}
   /* Hide Streamlit's fixed top toolbar (Deploy / menu) so it never overlaps the
      VOLUE header, and so the view is clean for a client. */
