@@ -38,8 +38,9 @@ class Base(DeclarativeBase):
     """Declarative base for all ORM models."""
 
 
-# Allowed price areas for the MVP (single area per portfolio).
-PRICE_AREAS = ("NO1", "NO2", "SE3")
+# Allowed price areas (Nordic bidding zones). One area per portfolio; a country view
+# aggregates the zones that share a country prefix (e.g. SE1-SE4 -> Sweden).
+PRICE_AREAS = ("NO1", "NO2", "NO3", "NO4", "NO5", "SE1", "SE2", "SE3", "SE4")
 
 
 class User(Base):
@@ -82,7 +83,10 @@ class Portfolio(Base):
     )
 
     __table_args__ = (
-        CheckConstraint("price_area IN ('NO1', 'NO2', 'SE3')", name="ck_portfolio_price_area"),
+        CheckConstraint(
+            "price_area IN ('NO1', 'NO2', 'NO3', 'NO4', 'NO5', 'SE1', 'SE2', 'SE3', 'SE4')",
+            name="ck_portfolio_price_area",
+        ),
     )
 
 

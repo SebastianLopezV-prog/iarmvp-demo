@@ -109,7 +109,12 @@ def clear_generated_tables() -> None:
 
 def parse_args() -> argparse.Namespace:
     ap = argparse.ArgumentParser(description="Seed a fully synthetic demo database.")
-    ap.add_argument("--area", default="NO2", help="price area (NO2 for the MVP)")
+    ap.add_argument(
+        "--areas",
+        nargs="+",
+        default=["SE1", "SE2", "SE3", "SE4"],
+        help="price areas to seed (default: the four Swedish bidding zones)",
+    )
     ap.add_argument("--days", type=int, default=30, help="days of day-ahead history to backfill")
     ap.add_argument("--scenarios", type=int, default=10_000, help="MC scenarios per run")
     ap.add_argument(
@@ -122,39 +127,33 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    areas = list(args.areas)
     bar = "=" * 64
     print(bar)
-    print(f"Seeding SYNTHETIC demo | area={args.area} days={args.days} scenarios={args.scenarios}")
+    print(f"Seeding SYNTHETIC demo | areas={areas} days={args.days} scenarios={args.scenarios}")
     print(bar)
 
-    print("\n[1/6] Ensuring a wind portfolio with positions exists...")
-    ensure_positions(args.area, args.days, args.fresh_positions)
+    print("\n[1/3] Ensuring a wind portfolio with positions for each area...")
+    for area in areas:
+        ensure_positions(area, args.days, args.fresh_positions)
 
-    print("\n[2/6] Clearing generated price/run tables (keeping positions)...")
+    print("\n[2/3] Clearing generated price/run tables once (keeping positions)...")
     clear_generated_tables()
 
-    print("\n[3/6] Backfilling day-ahead IaR history from the synthetic spread forecast...")
-    _run(
-        "backfill_history.py",
-        "--area",
-        args.area,
-        "--days",
-        str(args.days),
-        "--scenarios",
-        str(args.scenarios),
-    )
-
-    print("\n[3/5] Loading synthetic DAM + realised imbalance prices...")
-    _run("load_actuals.py", "--area", args.area, f"--start=-P{args.days + 1}D", "--end=P0D")
-
-    print("\n[4/5] Running one live forward IaR for the current day...")
-    _run("run_iar.py", "--area", args.area, "--scenarios", str(args.scenarios), "--store")
-
-    print("\n[5/5] Running the Kupiec backtest (Gross + Spread)...")
-    _run("run_backtest.py", "--area", args.area, "--basis", "both")
+    print("\n[3/3] Per-area: backfill history, synthetic prices, live run, backtest...")
+    for i, area in enumerate(areas, 1):
+        print(f"\n--- [{i}/{len(areas)}] {area} ---")
+        _run(
+            "backfill_history.py",
+            "--area", area, "--days", str(args.days), "--scenarios", str(args.scenarios),
+        )
+        _run("load_actuals.py", "--area", area, f"--start=-P{args.days + 1}D", "--end=P0D")
+        _run("run_iar.py", "--area", area, "--scenarios", str(args.scenarios), "--store")
+        _run("run_backtest.py", "--area", area, "--basis", "both")
 
     print(
-        f"\n{bar}\nDone. The demo database is now fully synthetic. "
+        f"\n{bar}\nDone. The demo database is now fully synthetic "
+        f"({len(areas)} zones: {', '.join(areas)}). "
         f"Launch the dashboard with scripts/run_dashboard.bat.\n{bar}"
     )
 

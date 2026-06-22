@@ -78,7 +78,7 @@ def prune_live_runs() -> int:
 
 def parse_args() -> argparse.Namespace:
     ap = argparse.ArgumentParser(description="Refresh the IaR database (scheduled).")
-    ap.add_argument("--areas", nargs="+", default=["NO2"])
+    ap.add_argument("--areas", nargs="+", default=["SE1", "SE2", "SE3", "SE4"])
     ap.add_argument(
         "--mode",
         choices=["fast", "full"],

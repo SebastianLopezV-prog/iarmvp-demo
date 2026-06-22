@@ -135,6 +135,18 @@ class DataSource(ABC):
 
         service.reset_limit_settings()
 
+    # Country roll-up (multi-zone). These read the aggregate via iar.service for every
+    # source, so the dashboard's country landing is source-agnostic like the rest.
+    def list_countries(self) -> pd.DataFrame:
+        from iar import service
+
+        return service.list_countries()
+
+    def country_overview(self, country: str, *, confidence: float = 0.95) -> dict:
+        from iar import service
+
+        return service.get_country_overview(country, confidence=confidence)
+
 
 # Empty-frame templates so the UI can render headers even with no rows.
 _EMPTY_INTRADAY = pd.DataFrame(

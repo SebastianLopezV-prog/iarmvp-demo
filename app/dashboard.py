@@ -245,6 +245,11 @@ def r_backtest(kind: str, pid: int, basis: str, significance: float) -> dict:
     return get_data_source(kind).backtest(pid, basis=basis, significance=significance)
 
 
+@st.cache_data(ttl=30, show_spinner=False)
+def r_country_overview(kind: str, country: str, confidence: float) -> dict:
+    return get_data_source(kind).country_overview(country, confidence=confidence)
+
+
 # --------------------------------------------------------------------------- #
 # Formatters / small helpers
 # --------------------------------------------------------------------------- #
@@ -368,6 +373,91 @@ def render_kpis(ov: dict) -> None:
     ]
     for col, html in zip(st.columns(4), cards):
         col.markdown(html, unsafe_allow_html=True)
+
+
+def render_breadcrumb(country_name: str, pf: dict) -> None:
+    """Small 'Country > Zone' trail shown atop the per-zone tabs."""
+    st.markdown(
+        f"<div style='color:{MUTED};font-size:.85rem;margin:-2px 0 8px'>"
+        f"{country_name} &nbsp;&rsaquo;&nbsp; "
+        f"<b style='color:{INK}'>{pf['price_area']} {pf['name']}</b></div>",
+        unsafe_allow_html=True,
+    )
+
+
+def render_country_overview(ov: dict, basis: str, pfs: pd.DataFrame) -> None:
+    """Country landing: aggregate KPIs + a per-MBA (bidding-zone) risk grid with drill-down."""
+    cname = ov["country_name"]
+    t = ov.get("totals")
+    section(f"{cname}: portfolio-wide Imbalance at Risk")
+    if not t or t.get("gross_iar") is None:
+        st.info(
+            "No country-level data available yet. Once the bidding zones have runs, the "
+            "Sweden total and the per-zone breakdown appear here."
+        )
+        return
+
+    n_at_risk = sum(1 for z in ov["zones"] if z.get("gross_severity") or z.get("spread_severity"))
+    div = ov.get("diversification_gross")
+    cards = [
+        kpi_card(
+            f"Period Gross IaR ({cname})",
+            eur(t["gross_iar"]),
+            f"Limit {eur(t['gross_limit'])} &middot; {pct(t['gross_utilisation'])} utilised",
+            t["gross_severity"],
+        ),
+        kpi_card(
+            f"Period Spread IaR ({cname})",
+            eur(t["spread_iar"]),
+            f"Limit {eur(t['spread_limit'])} &middot; {pct(t['spread_utilisation'])} utilised",
+            t["spread_severity"],
+        ),
+        kpi_card(
+            "Zones at risk",
+            f"{n_at_risk} of {ov['n_zones']}",
+            "Bidding zones over a limit threshold",
+            show_chip=False,
+        ),
+        kpi_card(
+            "Diversification ratio",
+            f"{div:.2f}" if div else "n/a",
+            "Sum of zone IaRs vs the diversified country IaR",
+            show_chip=False,
+        ),
+    ]
+    for col, html in zip(st.columns(4), cards):
+        col.markdown(html, unsafe_allow_html=True)
+
+    st.divider()
+    section(f"Risk by bidding zone (MBA): {basis.capitalize()} IaR")
+    zones = ov["zones"]
+    if not zones:
+        st.info("No zones to display.")
+        return
+    idx_by_pid = {int(r["portfolio_id"]): i for i, (_, r) in enumerate(pfs.iterrows())}
+    for col, z in zip(st.columns(len(zones)), zones):
+        iar, lim = z.get(f"{basis}_iar"), z.get(f"{basis}_limit")
+        util, sev = z.get(f"{basis}_utilisation"), z.get(f"{basis}_severity")
+        col.markdown(
+            kpi_card(
+                z["area"],
+                eur(iar),
+                f"Limit {eur(lim)} &middot; {pct(util)} &middot; {z['n_mtus']} MTUs",
+                sev,
+            ),
+            unsafe_allow_html=True,
+        )
+        i = idx_by_pid.get(int(z["portfolio_id"]))
+        if i is not None and col.button(
+            f"View {z['area']}", key=f"view_{z['area']}", use_container_width=True
+        ):
+            st.query_params["pf"] = str(i)
+            st.rerun()
+    st.caption(
+        "Open a zone to drill into its Command Centre, Risk Analytics and Historical detail. "
+        "The country IaR is the diversified quantile of summed cost across zones, not the sum "
+        "of the zone IaRs (the gap is the diversification ratio above)."
+    )
 
 
 def render_intraday(df: pd.DataFrame, basis: str) -> None:
@@ -1339,10 +1429,20 @@ def render_settings(kind: str):
             idx = 0
             st.markdown(f"**Portfolio:** {labels[0]}")
         else:
+            # Default the landing to the first Swedish zone (the portfolio-wide Sweden view
+            # the product is built around); the URL ?pf= overrides once a zone is chosen.
+            se_default = next(
+                (
+                    i
+                    for i, (_, r) in enumerate(pfs.iterrows())
+                    if str(r["price_area"]).upper().startswith("SE")
+                ),
+                0,
+            )
             try:
-                idx_default = min(max(int(_qp("pf", 0)), 0), len(labels) - 1)
+                idx_default = min(max(int(_qp("pf", se_default)), 0), len(labels) - 1)
             except ValueError:
-                idx_default = 0
+                idx_default = se_default
             idx = st.selectbox(
                 "Portfolio", range(len(labels)), index=idx_default, format_func=lambda i: labels[i]
             )
@@ -1495,12 +1595,17 @@ def main() -> None:
     _live_tick()
 
     header_box = st.container()  # header rendered once, above the tab strip
-    tabs = st.tabs(["Command Centre", "Risk Analytics", "Historical", "Usage", "Settings"])
+    tabs = st.tabs(
+        ["Overview", "Command Centre", "Risk Analytics", "Historical", "Usage", "Settings"]
+    )
 
     # Settings first (in code) so the selections drive the other tabs.
-    with tabs[4]:
+    with tabs[5]:
         pf, basis, confidence, significance = render_settings(kind)
     pid = int(pf["portfolio_id"])
+    # Country grouping for the portfolio-wide view: SE1-SE4 -> Sweden, NO* -> Norway.
+    country = str(pf["price_area"])[:2].upper()
+    country_label = {"SE": "Sweden", "NO": "Norway"}.get(country, country)
 
     with header_box:
 
@@ -1519,7 +1624,18 @@ def main() -> None:
     with tabs[0]:
 
         @st.fragment(run_every=AUTO_REFRESH_SECONDS)
+        def _overview() -> None:
+            render_country_overview(
+                r_country_overview(kind, country, confidence), basis, r_portfolios(kind)
+            )
+
+        _overview()
+
+    with tabs[1]:
+
+        @st.fragment(run_every=AUTO_REFRESH_SECONDS)
         def _command_centre() -> None:
+            render_breadcrumb(country_label, pf)
             ov = r_overview(kind, pid, confidence)
             if ov is None:
                 st.info("No data available for this portfolio yet.")
@@ -1537,10 +1653,11 @@ def main() -> None:
 
         _command_centre()
 
-    with tabs[1]:
+    with tabs[2]:
 
         @st.fragment(run_every=AUTO_REFRESH_SECONDS)
         def _risk_analytics() -> None:
+            render_breadcrumb(country_label, pf)
             ov = r_overview(kind, pid, confidence)
             if ov is None:
                 st.info("No data available for this portfolio yet.")
@@ -1559,15 +1676,16 @@ def main() -> None:
 
         _risk_analytics()
 
-    with tabs[2]:
+    with tabs[3]:
 
         @st.fragment(run_every=AUTO_REFRESH_SECONDS)
         def _historical() -> None:
+            render_breadcrumb(country_label, pf)
             render_backtest(r_backtest(kind, pid, basis, significance), basis)
 
         _historical()
 
-    with tabs[3]:
+    with tabs[4]:
         render_usage()
 
 

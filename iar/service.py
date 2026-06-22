@@ -161,6 +161,132 @@ def get_portfolio(
 
 
 # --------------------------------------------------------------------------- #
+# Countries / bidding zones (multi-zone roll-up)
+# --------------------------------------------------------------------------- #
+def list_countries(*, session: Session | None = None) -> pd.DataFrame:
+    """Distinct countries (area prefixes) across all portfolios, with zone counts.
+
+    Columns ``[country, country_name, n_zones]``. A country groups the bidding zones that
+    share a prefix (``SE1``..``SE4`` -> ``SE`` / Sweden).
+    """
+    from iar.risk.aggregate import country_name, country_of
+
+    with _scope(session) as s:
+        rows = s.query(Portfolio).all()
+        counts: dict[str, int] = {}
+        for p in rows:
+            counts[country_of(p.price_area)] = counts.get(country_of(p.price_area), 0) + 1
+        return pd.DataFrame(
+            [
+                {"country": c, "country_name": country_name(c), "n_zones": n}
+                for c, n in sorted(counts.items())
+            ],
+            columns=["country", "country_name", "n_zones"],
+        )
+
+
+def list_zones(country: str, *, session: Session | None = None) -> pd.DataFrame:
+    """Portfolios (one per bidding zone) for a country, ``[portfolio_id, name, price_area]``."""
+    from iar.risk.aggregate import country_of
+
+    with _scope(session) as s:
+        rows = s.query(Portfolio).order_by(Portfolio.price_area).all()
+        return pd.DataFrame(
+            [
+                {"portfolio_id": p.portfolio_id, "name": p.name, "price_area": p.price_area}
+                for p in rows
+                if country_of(p.price_area) == country.upper()
+            ],
+            columns=["portfolio_id", "name", "price_area"],
+        )
+
+
+def get_country_overview(
+    country: str,
+    *,
+    confidence: float = 0.95,
+    session: Session | None = None,
+) -> dict:
+    """Country roll-up plus a per-zone breakdown, both Gross and Spread.
+
+    The country IaR is the diversified quantile-of-summed-cost across the zones (see
+    :mod:`iar.risk.aggregate`), never a naive sum of zone IaRs. Each zone and the country
+    total carry their period (``remaining_day``) limit, utilisation and severity. Returns a
+    plain dict (UI/JSON friendly). ``totals``/``zones`` IaR fields are ``None`` if no zone
+    has runnable inputs.
+    """
+    from iar.risk.aggregate import AggregateConfig, compute_country, country_name
+
+    zones_df = list_zones(country, session=session)
+    areas = list(zones_df["price_area"]) if not zones_df.empty else []
+    base = {
+        "country": country.upper(),
+        "country_name": country_name(country),
+        "confidence": confidence,
+        "n_zones": 0,
+        "totals": None,
+        "zones": [],
+        "diversification_gross": None,
+        "diversification_spread": None,
+    }
+    if not areas:
+        return base
+
+    with _scope(session) as s:
+        agg = compute_country(s, areas, AggregateConfig(confidence=confidence))
+        try:
+            config = load_limits()
+        except FileNotFoundError:
+            config = None
+
+        def _limit(name: str, variant: str) -> float | None:
+            return config.limit_for(name, variant, "remaining_day") if config else None
+
+        def _enrich(name: str, gross_iar, spread_iar) -> dict:
+            gl, sl = _limit(name, "gross"), _limit(name, "spread")
+            return {
+                "gross_limit": gl,
+                "gross_utilisation": (gross_iar / gl) if gl else None,
+                "gross_severity": classify_severity(gross_iar, gl) if gl is not None else None,
+                "spread_limit": sl,
+                "spread_utilisation": (spread_iar / sl) if sl else None,
+                "spread_severity": classify_severity(spread_iar, sl) if sl is not None else None,
+            }
+
+        zones = []
+        sum_gl = sum_sl = 0.0
+        for z in agg["zones"]:
+            enr = _enrich(z["portfolio_name"], z["gross_iar"], z["spread_iar"])
+            sum_gl += enr["gross_limit"] or 0.0
+            sum_sl += enr["spread_limit"] or 0.0
+            zones.append({**z, **enr})
+
+        # Country limit = sum of the per-zone period limits (a sensible default until an
+        # explicit country limit is configured).
+        gi, si = agg["gross_iar"], agg["spread_iar"]
+        totals = {
+            "gross_iar": gi,
+            "gross_ciar": agg["gross_ciar"],
+            "spread_iar": si,
+            "spread_ciar": agg["spread_ciar"],
+            "gross_limit": sum_gl or None,
+            "gross_utilisation": (gi / sum_gl) if (gi is not None and sum_gl) else None,
+            "gross_severity": classify_severity(gi, sum_gl) if (gi is not None and sum_gl) else None,
+            "spread_limit": sum_sl or None,
+            "spread_utilisation": (si / sum_sl) if (si is not None and sum_sl) else None,
+            "spread_severity": classify_severity(si, sum_sl) if (si is not None and sum_sl) else None,
+        }
+        return {
+            **base,
+            "n_zones": agg["n_zones"],
+            "totals": totals,
+            "zones": zones,
+            "diversification_gross": agg["diversification_gross"],
+            "diversification_spread": agg["diversification_spread"],
+        }
+
+
+# --------------------------------------------------------------------------- #
 # IaR
 # --------------------------------------------------------------------------- #
 def get_latest_iar(portfolio_id: int, *, session: Session | None = None) -> dict | None:

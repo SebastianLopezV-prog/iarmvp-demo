@@ -25,6 +25,9 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
+# The demo showcases a full country (Sweden) as a sum across its bidding zones.
+DEMO_AREAS = ("SE1", "SE2", "SE3", "SE4")
+
 # First-load seed: kept modest so a cold host paints reasonably quickly, while still
 # showing a couple of weeks of backtest history.
 BOOT_SEED_DAYS = "14"
@@ -77,8 +80,8 @@ def ensure_demo_data() -> str:
     if latest is None:
         _run(
             "seed_synthetic_demo.py",
-            "--area",
-            "NO2",
+            "--areas",
+            *DEMO_AREAS,
             "--days",
             BOOT_SEED_DAYS,
             "--scenarios",
@@ -113,7 +116,7 @@ def maybe_advance() -> str:
         pass
 
     try:
-        _run("refresh.py", "--areas", "NO2")
+        _run("refresh.py", "--areas", *DEMO_AREAS)
         return "advanced"
     finally:
         try:
