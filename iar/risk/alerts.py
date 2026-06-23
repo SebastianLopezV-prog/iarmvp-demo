@@ -60,6 +60,7 @@ class LimitConfig:
     def __init__(self, data: dict):
         self._default: dict = data.get("default", {})
         self._portfolio: dict = data.get("portfolio", {})
+        self._country: dict = data.get("country", {})
 
     def limit_for(self, portfolio_name: str, variant: str, limit_type: str) -> float | None:
         """EUR limit for ``(portfolio, variant, limit_type)`` — override else default.
@@ -73,6 +74,18 @@ class LimitConfig:
         override = self._portfolio.get(portfolio_name, {}).get(variant, {})
         if key in override:
             value = override[key]
+        return float(value) if value is not None else None
+
+    def country_limit_for(self, country: str, variant: str, limit_type: str) -> float | None:
+        """EUR limit for an aggregated COUNTRY view (``[country.<CODE>]`` in limits.toml,
+        falling back to ``[country.default]``). ``None`` when no country limit is configured,
+        in which case the caller falls back to the sum of the per-zone limits.
+        """
+        if limit_type not in LIMIT_TYPES:
+            raise ValueError(f"limit_type must be one of {LIMIT_TYPES}, got {limit_type!r}")
+        key = f"{limit_type}_eur"
+        spec = self._country.get(country.upper()) or self._country.get("default") or {}
+        value = spec.get(variant, {}).get(key)
         return float(value) if value is not None else None
 
 

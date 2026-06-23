@@ -25,12 +25,13 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
-# The demo showcases a full country (Sweden) as a sum across its bidding zones.
-DEMO_AREAS = ("SE1", "SE2", "SE3", "SE4")
+# The demo showcases full countries as a sum across their bidding zones:
+# Sweden (SE1-SE4) and Norway (NO1-NO5).
+DEMO_AREAS = ("SE1", "SE2", "SE3", "SE4", "NO1", "NO2", "NO3", "NO4", "NO5")
 
 # First-load seed: kept modest so a cold host paints reasonably quickly, while still
 # showing a couple of weeks of backtest history.
-BOOT_SEED_DAYS = "14"
+BOOT_SEED_DAYS = "7"
 BOOT_SEED_SCENARIOS = "3000"
 
 # Live cadence: advance the synthetic data when the newest run is older than this. Ten

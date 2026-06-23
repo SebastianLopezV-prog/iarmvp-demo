@@ -17,3 +17,18 @@ remaining_day_eur = 2800
 # Example portfolio override (keyed by portfolio name); extend as portfolios are added.
 # [portfolio."NO2 Wind".gross]
 # remaining_day_eur = 75000
+
+# Country-level limits for the aggregated (portfolio-wide) Overview, keyed by area prefix
+# (SE = Sweden). Calibrated to the demo's diversified country IaR (~50% utilised). If a
+# country is absent here, its limit falls back to the sum of its zones' period limits.
+[country.default.gross]
+remaining_day_eur = 12000
+
+[country.default.spread]
+remaining_day_eur = 8000
+
+[country.SE.gross]
+remaining_day_eur = 12000
+
+[country.SE.spread]
+remaining_day_eur = 8000

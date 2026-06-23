@@ -114,6 +114,37 @@ def main() -> None:
         print(f"--- {area}: backtest ---")
         _run("run_backtest.py", "--area", area, "--basis", "both")
 
+    # Position-coverage check: warn in the log if any area's positions run out soon, so the
+    # "No overlapping MTUs" staleness is caught early. Fix with scripts/topup_positions.py.
+    try:
+        from datetime import timedelta
+
+        from iar.db.models import DAMPosition, Portfolio
+        from iar.db.session import get_session
+
+        now_naive = datetime.now(UTC).replace(tzinfo=None)
+        with get_session() as s:
+            for area in args.areas:
+                pf = (
+                    s.query(Portfolio)
+                    .filter_by(price_area=area)
+                    .order_by(Portfolio.portfolio_id.desc())
+                    .first()
+                )
+                if pf is None:
+                    continue
+                latest = max(
+                    (r.timestamp for r in s.query(DAMPosition).filter_by(portfolio_id=pf.portfolio_id)),
+                    default=None,
+                )
+                if latest is not None and (latest - now_naive) < timedelta(days=14):
+                    print(
+                        f"[refresh][warn] {area} positions only cover to {latest:%Y-%m-%d}; "
+                        "run scripts/topup_positions.py"
+                    )
+    except Exception as exc:
+        print(f"[refresh] position-coverage check skipped ({type(exc).__name__})")
+
     pruned = prune_live_runs()
     elapsed = (datetime.now(UTC) - started).total_seconds()
     print(f"[refresh] done in {elapsed:.0f}s; pruned {pruned} stale live run(s).")

@@ -261,20 +261,33 @@ def get_country_overview(
             sum_sl += enr["spread_limit"] or 0.0
             zones.append({**z, **enr})
 
-        # Country limit = sum of the per-zone period limits (a sensible default until an
-        # explicit country limit is configured).
+        # Country limit: the explicit [country.<CODE>] limit from limits.toml if configured,
+        # else fall back to the sum of the per-zone period limits.
+        cc = country.upper()
+        gl_country = (
+            (config.country_limit_for(cc, "gross", "remaining_day") if config else None)
+            or (sum_gl or None)
+        )
+        sl_country = (
+            (config.country_limit_for(cc, "spread", "remaining_day") if config else None)
+            or (sum_sl or None)
+        )
         gi, si = agg["gross_iar"], agg["spread_iar"]
         totals = {
             "gross_iar": gi,
             "gross_ciar": agg["gross_ciar"],
             "spread_iar": si,
             "spread_ciar": agg["spread_ciar"],
-            "gross_limit": sum_gl or None,
-            "gross_utilisation": (gi / sum_gl) if (gi is not None and sum_gl) else None,
-            "gross_severity": classify_severity(gi, sum_gl) if (gi is not None and sum_gl) else None,
-            "spread_limit": sum_sl or None,
-            "spread_utilisation": (si / sum_sl) if (si is not None and sum_sl) else None,
-            "spread_severity": classify_severity(si, sum_sl) if (si is not None and sum_sl) else None,
+            "gross_limit": gl_country,
+            "gross_utilisation": (gi / gl_country) if (gi is not None and gl_country) else None,
+            "gross_severity": (
+                classify_severity(gi, gl_country) if (gi is not None and gl_country) else None
+            ),
+            "spread_limit": sl_country,
+            "spread_utilisation": (si / sl_country) if (si is not None and sl_country) else None,
+            "spread_severity": (
+                classify_severity(si, sl_country) if (si is not None and sl_country) else None
+            ),
         }
         return {
             **base,

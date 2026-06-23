@@ -119,6 +119,10 @@ _CSS = f"""
   .kpi .val {{ font-size: 1.7rem; font-weight: 800; color: {INK}; line-height: 1.1;
                white-space: nowrap; margin-top: 6px; }}
   .kpi .sub {{ font-size: 0.78rem; color: {MUTED}; margin-top: 6px; min-height: 2.2em; }}
+  /* Thin utilisation bar (fills to % of limit, coloured by status). */
+  .kpi .ubar {{ height: 6px; border-radius: 4px; background: #eef0f3; margin-top: 10px;
+                overflow: hidden; }}
+  .kpi .ufill {{ height: 100%; border-radius: 4px; transition: width .3s ease; }}
 
   .dot {{ display: inline-block; width: 9px; height: 9px; border-radius: 50%;
           margin-right: 6px; vertical-align: middle; }}
@@ -321,7 +325,9 @@ def render_header(pf: dict, ov: dict | None, kind: str) -> None:
     )
 
 
-def kpi_card(label: str, value: str, sub: str, severity=None, show_chip: bool = True) -> str:
+def kpi_card(
+    label: str, value: str, sub: str, severity=None, show_chip: bool = True, util=None
+) -> str:
     text, colour = SEVERITY.get(severity, SEVERITY[None])
     top = colour if show_chip else "#d7dade"
     chip = (
@@ -332,11 +338,20 @@ def kpi_card(label: str, value: str, sub: str, severity=None, show_chip: bool = 
         if show_chip
         else ""
     )
+    # Optional thin utilisation bar (fills to % of limit; capped at 100% width).
+    bar = ""
+    if util is not None and isinstance(util, (int, float)) and util == util:
+        w = max(0.0, min(float(util), 1.0)) * 100
+        bar = (
+            f"<div class='ubar'><div class='ufill' "
+            f"style='width:{w:.0f}%;background:{colour}'></div></div>"
+        )
     return f"""
       <div class="kpi" style="border-top-color:{top}">
         <div class="lbl">{label}</div>
         <div class="val">{value}</div>
         <div class="sub">{sub}</div>
+        {bar}
         {chip}
       </div>"""
 
@@ -405,12 +420,14 @@ def render_country_overview(ov: dict, basis: str, pfs: pd.DataFrame) -> None:
             eur(t["gross_iar"]),
             f"Limit {eur(t['gross_limit'])} &middot; {pct(t['gross_utilisation'])} utilised",
             t["gross_severity"],
+            util=t["gross_utilisation"],
         ),
         kpi_card(
             f"Period Spread IaR ({cname})",
             eur(t["spread_iar"]),
             f"Limit {eur(t['spread_limit'])} &middot; {pct(t['spread_utilisation'])} utilised",
             t["spread_severity"],
+            util=t["spread_utilisation"],
         ),
         kpi_card(
             "Zones at risk",
@@ -444,6 +461,7 @@ def render_country_overview(ov: dict, basis: str, pfs: pd.DataFrame) -> None:
                 eur(iar),
                 f"Limit {eur(lim)} &middot; {pct(util)} &middot; {z['n_mtus']} MTUs",
                 sev,
+                util=util,
             ),
             unsafe_allow_html=True,
         )
@@ -451,13 +469,114 @@ def render_country_overview(ov: dict, basis: str, pfs: pd.DataFrame) -> None:
         if i is not None and col.button(
             f"View {z['area']}", key=f"view_{z['area']}", use_container_width=True
         ):
+            # Drill into the zone: set the selected portfolio and rerun the whole APP (not just
+            # this fragment) so the Settings selector + the per-zone tabs follow.
             st.query_params["pf"] = str(i)
-            st.rerun()
+            st.rerun(scope="app")
     st.caption(
         "Open a zone to drill into its Command Centre, Risk Analytics and Historical detail. "
         "The country IaR is the diversified quantile of summed cost across zones, not the sum "
         "of the zone IaRs (the gap is the diversification ratio above)."
     )
+
+    render_zone_comparison(ov)
+    render_diversification(ov, basis)
+
+
+def render_zone_comparison(ov: dict) -> None:
+    """Two side-by-side comparison charts across all zones: Gross vs Spread IaR (EUR), and
+    limit utilisation (%) with soft/hard reference lines. Puts every zone's numbers together."""
+    zones = ov.get("zones") or []
+    if not zones:
+        return
+    st.divider()
+    section("Zone comparison")
+    areas = [z["area"] for z in zones]
+    left, right = st.columns(2)
+    with left:
+        fig = go.Figure()
+        fig.add_bar(
+            x=areas, y=[z.get("gross_iar") or 0.0 for z in zones],
+            name="Gross", marker_color=VOLUE_ORANGE, marker_line_width=0,
+        )
+        fig.add_bar(
+            x=areas, y=[z.get("spread_iar") or 0.0 for z in zones],
+            name="Spread", marker_color=BLUE, marker_line_width=0,
+        )
+        fig.update_layout(
+            barmode="group", height=300, title="Gross vs Spread IaR (EUR)",
+            legend=dict(orientation="h", y=-0.2), margin=dict(l=10, r=10, t=40, b=10),
+        )
+        st.plotly_chart(_style_fig(fig), use_container_width=True, config={"displayModeBar": False})
+    with right:
+        fig2 = go.Figure()
+        fig2.add_bar(
+            x=areas, y=[100 * (z.get("gross_utilisation") or 0.0) for z in zones],
+            name="Gross", marker_color=VOLUE_ORANGE, marker_line_width=0,
+        )
+        fig2.add_bar(
+            x=areas, y=[100 * (z.get("spread_utilisation") or 0.0) for z in zones],
+            name="Spread", marker_color=BLUE, marker_line_width=0,
+        )
+        fig2.add_hline(y=100, line=dict(color=BREACH_RED, width=2, dash="dash"),
+                       annotation_text="Limit", annotation_position="top left")
+        fig2.add_hline(y=80, line=dict(color=WARN_AMBER, width=1, dash="dot"))
+        fig2.update_layout(
+            barmode="group", height=300, title="Limit utilisation (%)",
+            legend=dict(orientation="h", y=-0.2), margin=dict(l=10, r=10, t=40, b=10),
+        )
+        st.plotly_chart(_style_fig(fig2), use_container_width=True, config={"displayModeBar": False})
+
+
+def render_diversification(ov: dict, basis: str) -> None:
+    """Show the diversification benefit: per-zone IaR stacked to the naive sum, with a marker
+    at the diversified country IaR (always shorter), so the gap is read at a glance."""
+    zones = ov.get("zones") or []
+    t = ov.get("totals") or {}
+    country_iar = t.get(f"{basis}_iar")
+    if len(zones) < 2 or country_iar is None:
+        return
+    st.divider()
+    section(f"Diversification benefit: {basis.capitalize()} IaR")
+    palette = [VOLUE_ORANGE, TEAL, BLUE, PURPLE, OK_GREEN, WARN_AMBER, BREACH_RED]
+    fig = go.Figure()
+    for j, z in enumerate(zones):
+        fig.add_bar(
+            x=[z.get(f"{basis}_iar") or 0.0],
+            y=["Zones"],
+            name=z["area"],
+            orientation="h",
+            marker_color=palette[j % len(palette)],
+            marker_line_width=0,
+            hovertemplate=f"{z['area']}: %{{x:,.0f}} EUR<extra></extra>",
+        )
+    sum_zones = sum((z.get(f"{basis}_iar") or 0.0) for z in zones)
+    fig.add_vline(
+        x=country_iar,
+        line=dict(color=INK, width=2.5, dash="dot"),
+        annotation_text=f"Diversified {cname_short(ov)} IaR  {eur(country_iar)}",
+        annotation_position="top",
+        annotation_font_color=INK,
+    )
+    fig.update_layout(
+        barmode="stack",
+        height=190,
+        showlegend=True,
+        legend=dict(orientation="h", y=-0.35),
+        xaxis_title="EUR",
+        yaxis=dict(showticklabels=False),
+        margin=dict(l=10, r=20, t=30, b=10),
+    )
+    st.plotly_chart(_style_fig(fig), use_container_width=True, config={"displayModeBar": False})
+    st.caption(
+        f"The stacked bar is the naive sum of the zone IaRs ({eur(sum_zones)}); the dotted "
+        f"line is the diversified country IaR ({eur(country_iar)}). The gap is the "
+        "diversification benefit from imperfectly-correlated zones."
+    )
+
+
+def cname_short(ov: dict) -> str:
+    return ov.get("country_name", ov.get("country", ""))
 
 
 def render_intraday(df: pd.DataFrame, basis: str) -> None:
