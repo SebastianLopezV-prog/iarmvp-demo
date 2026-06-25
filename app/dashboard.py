@@ -1724,7 +1724,7 @@ def main() -> None:
     pid = int(pf["portfolio_id"])
     # Country grouping for the portfolio-wide view: SE1-SE4 -> Sweden, NO* -> Norway.
     country = str(pf["price_area"])[:2].upper()
-    country_label = {"SE": "Sweden", "NO": "Norway"}.get(country, country)
+    country_label = {"SE": "Sweden", "NO": "Norway", "FI": "Finland"}.get(country, country)
 
     with header_box:
 

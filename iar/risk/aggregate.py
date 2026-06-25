@@ -35,7 +35,7 @@ from iar.simulation.price_sampler import QuantilePriceSampler
 MTU_HOURS = 0.25  # 15-minute MTU
 
 #: Human-readable country names for the area prefixes.
-COUNTRY_NAMES = {"SE": "Sweden", "NO": "Norway"}
+COUNTRY_NAMES = {"SE": "Sweden", "NO": "Norway", "FI": "Finland"}
 
 
 def country_of(area: str) -> str:

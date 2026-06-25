@@ -26,8 +26,8 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 # The demo showcases full countries as a sum across their bidding zones:
-# Sweden (SE1-SE4) and Norway (NO1-NO5).
-DEMO_AREAS = ("SE1", "SE2", "SE3", "SE4", "NO1", "NO2", "NO3", "NO4", "NO5")
+# Sweden (SE1-SE4), Norway (NO1-NO5) and Finland (single zone FI).
+DEMO_AREAS = ("SE1", "SE2", "SE3", "SE4", "NO1", "NO2", "NO3", "NO4", "NO5", "FI")
 
 # First-load seed: kept modest so a cold host paints reasonably quickly, while still
 # showing a couple of weeks of backtest history.

@@ -40,7 +40,7 @@ class Base(DeclarativeBase):
 
 # Allowed price areas (Nordic bidding zones). One area per portfolio; a country view
 # aggregates the zones that share a country prefix (e.g. SE1-SE4 -> Sweden).
-PRICE_AREAS = ("NO1", "NO2", "NO3", "NO4", "NO5", "SE1", "SE2", "SE3", "SE4")
+PRICE_AREAS = ("NO1", "NO2", "NO3", "NO4", "NO5", "SE1", "SE2", "SE3", "SE4", "FI")
 
 
 class User(Base):
@@ -84,7 +84,8 @@ class Portfolio(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "price_area IN ('NO1', 'NO2', 'NO3', 'NO4', 'NO5', 'SE1', 'SE2', 'SE3', 'SE4')",
+            "price_area IN ('NO1', 'NO2', 'NO3', 'NO4', 'NO5', "
+            "'SE1', 'SE2', 'SE3', 'SE4', 'FI')",
             name="ck_portfolio_price_area",
         ),
     )

@@ -27,7 +27,7 @@ from iar.db.session import get_session, init_db
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Deterministic per-area seed so a regenerated window reproduces the same history.
-SEED_MAP = {"NO2": 1, "SE1": 2, "SE2": 3, "SE3": 4, "SE4": 5, "NO1": 6, "NO3": 7, "NO4": 8, "NO5": 9}
+SEED_MAP = {"NO2": 1, "SE1": 2, "SE2": 3, "SE3": 4, "SE4": 5, "NO1": 6, "NO3": 7, "NO4": 8, "NO5": 9, "FI": 10}
 DEFAULT_START = "2026-05-10"
 
 

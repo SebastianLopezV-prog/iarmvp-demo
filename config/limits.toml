@@ -32,3 +32,9 @@ remaining_day_eur = 12000
 
 [country.SE.spread]
 remaining_day_eur = 8000
+
+[country.FI.gross]
+remaining_day_eur = 4000
+
+[country.FI.spread]
+remaining_day_eur = 2800
