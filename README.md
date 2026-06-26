@@ -15,7 +15,7 @@ European balancing market. The euro figures are illustrative (see "Important: il
 numbers").
 
 **Hosted version:** https://dashboardpy-tozjybvhqntptotgbyf2tx.streamlit.app/ (click and
-explore, nothing to install).
+explore, nothing to install. Will be shut down after 6/30/2026)
 
 ---
 
