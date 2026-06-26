@@ -15,7 +15,7 @@ European balancing market. The euro figures are illustrative (see "Important: il
 numbers").
 
 **Hosted version:** https://dashboardpy-tozjybvhqntptotgbyf2tx.streamlit.app/ (click and
-explore, nothing to install. Will be shut down after 6/30/2026)
+explore, nothing to install).
 
 ---
 
@@ -251,3 +251,63 @@ and real settled history. See `docs/README.md` ("From MVP to production") for th
 
 Python 3.11+ and the packages in `requirements.txt` (all public PyPI). No API key, no
 private/internal packages, no data downloads.
+
+---
+
+## Getting started (for developers)
+
+A practical onboarding guide for a developer picking this up.
+
+### First run
+
+1. **Python 3.11+.** Clone the repo. `python -m venv venv` then
+   `venv\Scripts\pip install -r requirements.txt` (all public PyPI).
+2. **Run it:** `venv\Scripts\python -m streamlit run app/dashboard.py`. On first launch it
+   **self-seeds** its own synthetic dataset (positions, prices, day-ahead history, a run, the
+   backtest) for all zones - one to two minutes of "Preparing the live demo data", then it is
+   fast and ticks forward while open. No keys, no data files.
+3. The `iar` package imports straight from the repo (the app prepends the repo root to
+   `sys.path`), so `pip install -e .` is not required just to run.
+
+### What makes the demo the demo
+
+- **It is synthetic-only.** Every feed is generated in **`iar/ingestion/synthetic.py`** (a
+  deterministic Nordic market model) and served through **`iar/ingestion/clients.py`** (a
+  factory that returns only synthetic clients). **There is no real-feed code path - do not add
+  one** (that is the live build's job; keep the two in feature parity instead).
+- **`app/bootstrap.py`** self-seeds an empty database on a host and advances it forward when
+  it goes stale (`ensure_demo_data` / `maybe_advance`). `DEMO_AREAS` lists the zones it seeds.
+- Otherwise the engine, risk, service and UI are the **same code as the live build** - only
+  the ingestion layer differs.
+
+### Common tasks
+
+- **Rebuild the synthetic DB:** `python scripts/seed_synthetic_demo.py --areas SE1 SE2 SE3 SE4
+  NO1 NO2 NO3 NO4 NO5 FI --days 14`. (Or delete `data/iar.db` and just launch the app - it
+  self-seeds.)
+- **Add a market:** add the area to `DEMO_AREAS` in `app/bootstrap.py`, to `PRICE_AREAS` and
+  the `price_area` CHECK in `iar/db/models.py`, a country name in `iar/risk/aggregate.py`, and
+  a `[country.<CODE>]` limit in `config/limits.toml`; then reseed (SQLite cannot ALTER a
+  CHECK, so delete the DB and reseed, or migrate the `portfolios` table).
+- **Run the tests:** the uv `.venv` has `pytest`/`pytest-socket`
+  (`.venv\Scripts\python -m pytest -q`), or `pip install pytest pytest-socket` into your venv.
+
+### Deploying (this is what publishes the hosted link)
+
+- The hosted app is **Streamlit Community Cloud**, deployed from the **personal** repo
+  `SebastianLopezV-prog/iarmvp-demo` (Cloud's source). **Push to that repo to redeploy;** the
+  app rebuilds and self-seeds on cold start.
+- Also open a PR into the governed `Volue/iarmvp-demo` (protected `main`) to keep it in sync.
+- **`uv.lock` is intentionally NOT committed here.** Streamlit Cloud's older `uv` cannot parse
+  a lock written by a newer local `uv`, and a committed lock diverts Cloud away from the
+  known-good `pip install -r requirements.txt` path. CI uses `uv sync` (no `--frozen`).
+- Keep `requirements.txt` to public deps only (no `optimeering`/`optipyclient`) - they are
+  never imported in synthetic mode and pin/inflate the Cloud build.
+
+### Architecture rules (shared with live)
+
+SQLite is the integration hub; the UI reads only through `iar/service.py` (via
+`app/data_source.py`); the engine draws price and imbalance independently (a `ScenarioDraw`
+seam for a future copula); summaries are stored, not raw scenarios. House style: no emojis, no
+em/en dashes in UI strings. The live build is the counterpart:
+**https://github.com/Volue/iarmvp-live**.
