@@ -492,8 +492,21 @@ def render_zone_comparison(ov: dict) -> None:
     st.divider()
     section("Zone comparison")
     areas = [z["area"] for z in zones]
+
+    def _finish(fig: go.Figure) -> go.Figure:
+        # _style_fig forces a top legend + tight top margin; override it AFTER so the legend
+        # sits clearly below the plot and the chart header above has its own space.
+        f = _style_fig(fig)
+        f.update_layout(
+            height=300,
+            legend=dict(orientation="h", yanchor="top", y=-0.16, x=0),
+            margin=dict(l=10, r=10, t=10, b=46),
+        )
+        return f
+
     left, right = st.columns(2)
     with left:
+        st.markdown("**Gross vs Spread IaR (EUR)**")
         fig = go.Figure()
         fig.add_bar(
             x=areas, y=[z.get("gross_iar") or 0.0 for z in zones],
@@ -503,12 +516,10 @@ def render_zone_comparison(ov: dict) -> None:
             x=areas, y=[z.get("spread_iar") or 0.0 for z in zones],
             name="Spread", marker_color=BLUE, marker_line_width=0,
         )
-        fig.update_layout(
-            barmode="group", height=300, title="Gross vs Spread IaR (EUR)",
-            legend=dict(orientation="h", y=-0.2), margin=dict(l=10, r=10, t=40, b=10),
-        )
-        st.plotly_chart(_style_fig(fig), use_container_width=True, config={"displayModeBar": False})
+        fig.update_layout(barmode="group")
+        st.plotly_chart(_finish(fig), use_container_width=True, config={"displayModeBar": False})
     with right:
+        st.markdown("**Limit utilisation (%)**")
         fig2 = go.Figure()
         fig2.add_bar(
             x=areas, y=[100 * (z.get("gross_utilisation") or 0.0) for z in zones],
@@ -521,11 +532,8 @@ def render_zone_comparison(ov: dict) -> None:
         fig2.add_hline(y=100, line=dict(color=BREACH_RED, width=2, dash="dash"),
                        annotation_text="Limit", annotation_position="top left")
         fig2.add_hline(y=80, line=dict(color=WARN_AMBER, width=1, dash="dot"))
-        fig2.update_layout(
-            barmode="group", height=300, title="Limit utilisation (%)",
-            legend=dict(orientation="h", y=-0.2), margin=dict(l=10, r=10, t=40, b=10),
-        )
-        st.plotly_chart(_style_fig(fig2), use_container_width=True, config={"displayModeBar": False})
+        fig2.update_layout(barmode="group")
+        st.plotly_chart(_finish(fig2), use_container_width=True, config={"displayModeBar": False})
 
 
 def render_diversification(ov: dict, basis: str) -> None:

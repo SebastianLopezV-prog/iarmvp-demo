@@ -1,14 +1,18 @@
-# Imbalance at Risk (IaR) — Demo
+# Imbalance at Risk (IaR) MVP - Demo build
+
+> **This is the DEMO build of the IaR MVP** - it runs on 100% synthetic, market-like data
+> (no API key, no private SDKs, no external data, no network at runtime), so it is safe to
+> clone, run, and share. The **LIVE build** runs the same product on real feeds (Optimeering
+> forecasts, Nord Pool day-ahead prices, windsim positions) and lives in a separate repo:
+> **https://github.com/Volue/iarmvp-live**. The two are kept in feature parity; the only
+> difference is the data source.
 
 A self-contained demo of an **Imbalance at Risk (IaR)** tool for a wind generation
 portfolio. IaR estimates the worst-case imbalance settlement cost at a chosen confidence
 level (e.g. the 95th percentile loss) over a forward horizon, via Monte Carlo simulation.
 It is the Value-at-Risk analogue for a portfolio's imbalance position in the Nordic and
-European balancing market.
-
-> **This is a synthetic demo. It runs on 100% fake, market-like data — no API key, no
-> private SDKs, no external data, and no network at runtime.** It is safe to clone, run,
-> and share. The euro figures are illustrative (see "Important: illustrative numbers").
+European balancing market. The euro figures are illustrative (see "Important: illustrative
+numbers").
 
 **Hosted version:** https://dashboardpy-tozjybvhqntptotgbyf2tx.streamlit.app/ (click and
 explore, nothing to install).
@@ -40,8 +44,12 @@ plotly). The `iar` package is imported directly from the repo (the app adds the 
 
 ## What you are looking at
 
-A VOLUE-styled "Command Centre" dashboard with five tabs:
+A VOLUE-styled "Command Centre" dashboard with six tabs:
 
+- **Overview** - the portfolio-wide landing view: country aggregate KPIs (Gross/Spread IaR vs
+  the country limit, utilisation, zones-at-risk, diversification ratio), a per-MBA
+  (bidding-zone) grid with status colours so the riskiest zone is obvious, a **View** button
+  to drill into any zone, and comparison + diversification charts.
 - **Command Centre** — period Gross/Spread IaR vs limits with status, peak-MTU IaR, an
   intraday per-MTU chart, and two heatmaps (forecast worst-case IaR, and realised settled
   cost), plus a limit table and alert feed.
@@ -65,6 +73,51 @@ on that exposure:
 - **CIaR / Expected Shortfall** — the average loss in the tail beyond IaR.
 - **Period IaR** is the quantile of the *summed* P&L across all MTUs in the horizon — not the
   sum of per-MTU IaRs (which would assume every interval has its worst outcome at once).
+
+## Markets and country view
+
+The demo covers all Nordic bidding zones, grouped into countries: **Norway** (NO1-NO5),
+**Sweden** (SE1-SE4) and **Finland** (FI, a single zone). A bidding zone, or **MBA (Market
+Balance Area)**, is the area within which one imbalance price applies; each zone is modelled
+separately, then aggregated.
+
+A country's IaR is **not** the sum of its zones' IaRs - that would ignore diversification (a
+bad imbalance hour in one zone rarely coincides with the worst hour in another). The country
+figure is the **quantile of the per-scenario cost summed across zones**, which is at most the
+naive sum. The **diversification ratio = (sum of zone IaRs) / (country IaR)** measures the
+benefit. (In this demo the zones are drawn independently, so the diversification shown is
+optimistic; real zones are weather-correlated.)
+
+## Customer input and product decisions (handover record)
+
+**Stakeholder feedback that shaped the product** and how it was addressed:
+
+| Customer ask | Status |
+|--------------|--------|
+| See the whole portfolio (e.g. all of Sweden) as the starting view | Done - the Overview tab, defaults to the country roll-up |
+| When a KPI lights up red, show values per MBA to see which zone carries the risk | Done - per-MBA grid with status colours + comparison charts |
+| Drill into a bidding zone for more detail | Done - View buttons + breadcrumb into the zone's tabs |
+| Easy limit setting; clear explanation of each figure | Done - Settings (per-zone/country limits) + captions throughout |
+| "...and the underlying positions" within a zone | Partial - zones show aggregate position, not per-asset breakdown |
+| How does this tie in with intraday (ID) trading? | Not yet - the model uses the day-ahead position only |
+| Output to drive ID hedging when a KPI is red | Not yet - the tool measures/flags risk; trade suggestions are future work |
+
+**Key design decisions and why:**
+
+- **Independence assumption** - price and imbalance, prices across MTUs, and zones across a
+  country are drawn independently (a deliberate MVP simplification; a copula would slot into
+  the `ScenarioDraw` seam later). It biases IaR optimistically low and makes the
+  diversification benefit optimistic.
+- **Summed-quantile period IaR** (quantile of summed cost, not sum of quantiles) - the
+  statistically correct aggregation across time and zones, and the source of the
+  diversification ratio.
+- **Database as the integration hub + UI behind a thin service layer** - keeps components
+  independently testable and the UI source-agnostic, which is exactly why this demo can swap
+  real feeds for synthetic ones with no UI changes.
+- **Store summaries, regenerate from seed** - runs persist IaR/CIaR + seed, not raw
+  scenarios; the country roll-up re-derives per-scenario cost on read.
+- **Backtest validity (Kupiec)** - each observation is one settled day, so the test is
+  under-powered until many days accumulate; treat it as an indicator, not a verdict.
 
 ## How the demo works
 
