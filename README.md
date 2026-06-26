@@ -254,6 +254,37 @@ private/internal packages, no data downloads.
 
 ---
 
+## Data model (the integration contract)
+
+SQLite *is* the integration hub, so the schema (`iar/db/models.py`) is the contract every
+component agrees on. Twelve tables in four groups (identical to the live build):
+
+**Identity:** `users` (`user_id`, `name`); `portfolios` (`portfolio_id`, `user_id` unique,
+`name`, `price_area` - one wind portfolio per user in one bidding zone; `price_area` has a
+CHECK of the allowed zones).
+
+**Portfolio inputs** (per portfolio, per 15-min MTU): `dam_positions` (`mwh`, the day-ahead
+sold position), `generation_forecasts` (`forecast_mwh`), `actual_deliveries` (`actual_mwh`).
+
+**Market data** (per `price_area`, per MTU, shared across a zone): `imbalance_price_forecasts`
+(`vintage_ts`, `quantile`, `value` - the spread, P01-P99), `dam_prices` (`price` - day-ahead
+spot), `actual_imbalance_prices` (`price` - settled).
+
+**Outputs:** `simulation_runs` (`run_id`, `portfolio_id`, `run_ts`, `vintage_ts`,
+`n_scenarios`, `seed`, `config_json`, `per_mtu_json` - one per run; the seed lets scenarios be
+regenerated), `iar_results` (`iar_type` gross/spread, `confidence`, `iar_value`, `ciar_value` -
+two per run), `alerts` (limit breaches), `historical_performance_records` (one row per settled
+day - the backtest).
+
+**Relationships:** `user 1-1 portfolio`; `portfolio 1-many` its inputs/runs/alerts; `run
+1-many iar_results`. Market tables are keyed by `(price_area, timestamp[, vintage_ts])` so all
+portfolios in a zone share them.
+
+**The `vintage_ts`** is the as-of time of a run's inputs; the backtest joins each settled day's
+realised cost to the latest estimate whose vintage precedes that day (no look-ahead).
+**Configuration** is in `config/app.toml` (scenarios, seed, confidence, MTU/horizon, the
+imbalance model) and `config/limits.toml` (per-zone + per-country limits).
+
 ## Getting started (for developers)
 
 A practical onboarding guide for a developer picking this up.
@@ -311,3 +342,50 @@ SQLite is the integration hub; the UI reads only through `iar/service.py` (via
 seam for a future copula); summaries are stored, not raw scenarios. House style: no emojis, no
 em/en dashes in UI strings. The live build is the counterpart:
 **https://github.com/Volue/iarmvp-live**.
+
+### Where to start reading (code tour)
+
+1. **`iar/db/models.py`** - the schema / data contract (see "Data model" above).
+2. **`iar/ingestion/synthetic.py`** - the market model (DAM, spread, realised price) + the
+   wind-portfolio generator; **`clients.py`** - the synthetic-only factory.
+3. **`scripts/seed_synthetic_demo.py`** - how the DB is built; **`app/bootstrap.py`** -
+   self-seed + forward-advance on a host.
+4. **`scripts/run_iar.py`** - assembles one run (synthetic forecast + DAM + DB positions ->
+   engine -> persist).
+5. **`iar/simulation/engine.py`** -> `run_simulation` - the Monte Carlo and summed-quantile
+   IaR/CIaR (the `ScenarioDraw` seam).
+6. **`iar/risk/aggregate.py`** -> `compute_country` - the diversified country roll-up.
+7. **`iar/service.py`** -> **`app/data_source.py`** -> **`app/dashboard.py`** - read API, seam,
+   rendering.
+
+### Troubleshooting
+
+| Symptom | Cause and fix |
+|---------|---------------|
+| "Preparing the live demo data" never clears | the first-load seed is slow or failed; wait a minute and reload, or rebuild with `seed_synthetic_demo.py` |
+| Blank tabs on a host | the seed subprocess could not `import iar`; `bootstrap.py` prepends the repo root to `PYTHONPATH` - keep that intact |
+| `ModuleNotFoundError: iar` | run from the repo root |
+| Streamlit Cloud build fails parsing `uv.lock` | `uv.lock` must **not** be committed here (older Cloud `uv` cannot parse it); it is gitignored on purpose |
+| Port 8501/8502 already in use | a dashboard is already running; close it or pass `--server.port` |
+| Tests fail on `import pytest_socket` | use the dev env (`uv sync` or `pip install pytest pytest-socket`) |
+
+## Glossary
+
+| Term | Meaning |
+|------|---------|
+| **IaR** (Imbalance at Risk) | Worst-case imbalance settlement cost at a confidence level over a horizon; the Value-at-Risk analogue for imbalance. |
+| **CIaR / Expected Shortfall** | Average cost in the tail *beyond* the IaR threshold. |
+| **Gross IaR** | `position x imbalance price` - total settlement cost. |
+| **Spread IaR** | `position x (imbalance price - DAM price)` - underperformance vs the day-ahead price. |
+| **MTU** | Market Time Unit - the 15-minute settlement interval. |
+| **MBA / bidding zone / price area** | Market Balance Area - the region within which one imbalance price applies (e.g. NO2, SE3, FI). |
+| **DAM** | Day-Ahead Market - where the portfolio sells volume the day before delivery; its cleared price is the "spot" price. |
+| **TSO** | Transmission System Operator - balances the grid and sets the imbalance price. |
+| **Imbalance** | `DAM position - actual delivery` (MWh), settled at the imbalance price. |
+| **Spread** | Imbalance price minus DAM price (what the forecast feed publishes; Gross IaR needs `DAM + spread`). |
+| **Vintage (`vintage_ts`)** | The as-of time of a run's inputs; lets the backtest avoid look-ahead. |
+| **Period IaR (summed-quantile)** | The quantile of the cost *summed* across MTUs - not the sum of per-MTU quantiles. |
+| **Diversification ratio** | `(sum of zone IaRs) / (country IaR)`; >1 means the portfolio is less risky than the naive sum. |
+| **Kupiec POF test** | A proportion-of-failures test: do breaches occur about as often as the confidence level implies? |
+| **P05 / P95** | The 5th / 95th percentile; "95% confidence" reads the 95th-percentile worst case. |
+| **sigma** | The forecast-error size in the parametric imbalance model. |
