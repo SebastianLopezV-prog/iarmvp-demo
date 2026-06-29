@@ -7,3 +7,4 @@ It shall not be redistributed to or otherwise shared with any third party, nor s
 As a principle any license to Volue software should be granted as non-exclusive, restricted (subject to the existence/payment of a maintenance or lease agreement), non-transferable and non-sublicensable.
 
 No customer or third party shall be granted any right to copy (other than for back-up purposes), reverse engineer, modify or create derivatives of the software and its related documentation unless explicitly agreed with Volue in writing.
+
