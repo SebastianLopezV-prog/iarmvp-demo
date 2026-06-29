@@ -15,3 +15,4 @@ openpyxl
 # NOTE: the real Optimeering SDK (`optimeering`) and the internal `optipyclient` wheel are
 # intentionally NOT listed. The demo runs on synthetic feeds, so neither is imported. Adding
 # `optimeering` only pins Python >=3.11 and adds build weight for no runtime benefit here.
+
