@@ -42,3 +42,4 @@ vendor/
 # uv that cannot parse a newer-uv lock ("missing field version"); committing it also diverts
 # Cloud from the known-good pip install -r requirements.txt path. CI uses uv sync (no --frozen).
 uv.lock
+
