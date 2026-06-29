@@ -2,7 +2,10 @@
 # Streamlit free-tier apps sleep after a stretch of inactivity; a plain HTTP ping does not
 # reliably count as activity (sleep is tracked by real app sessions), so this loads the app
 # in a headless browser (which opens the websocket session) and clicks the wake button if the
-# app is found asleep. Runs on a schedule on GitHub's infrastructure - no local machine needed.
+# app is found asleep. Runs on GitHub's infrastructure - no local machine needed.
+#
+# NOTE: this org enforces SHA-pinning for Actions, so this workflow deliberately uses NO
+# marketplace actions (no `uses:`) - it relies on the runner's built-in python3.
 name: Keep demo awake
 
 on:
@@ -10,7 +13,6 @@ on:
     - cron: "0 */6 * * *"   # every 6 hours (GitHub may delay scheduled runs by a few minutes)
   workflow_dispatch:         # allows a manual run from the Actions tab
 
-# Don't pile up runs if one is slow.
 concurrency:
   group: keep-awake
   cancel-in-progress: false
@@ -19,19 +21,16 @@ jobs:
   wake:
     runs-on: ubuntu-latest
     steps:
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
       - name: Install Playwright + Chromium
         run: |
-          pip install playwright
-          python -m playwright install --with-deps chromium
+          python3 -m pip install --upgrade pip
+          python3 -m pip install playwright
+          python3 -m playwright install --with-deps chromium
       - name: Visit the app (resets inactivity / wakes it)
         env:
           APP_URL: "https://dashboardpy-tozjybvhqntptotgbyf2tx.streamlit.app/"
         run: |
-          python - <<'PY'
+          python3 - <<'PY'
           import os
           from playwright.sync_api import sync_playwright
 
@@ -41,13 +40,11 @@ jobs:
               page = browser.new_page()
               print(f"Loading {url}")
               page.goto(url, wait_until="domcontentloaded", timeout=120000)
-              # If the app is asleep, Streamlit shows a wake button; click it if present.
               try:
                   page.get_by_text("get this app back up", exact=False).click(timeout=15000)
                   print("Wake button found and clicked.")
               except Exception:
                   print("No wake button (app was already awake).")
-              # Hold the session open so the visit registers as real activity / the app finishes waking.
               page.wait_for_timeout(45000)
               print("Done.")
               browser.close()
