@@ -5,3 +5,4 @@
   "python.testing.pytestArgs": ["tests"],
   "python.analysis.extraPaths": ["${workspaceFolder}"]
 }
+
